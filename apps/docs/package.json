@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "start": "docusaurus start",
-    "build": "docusaurus build"
+    "build": "docusaurus build",
+    "typecheck": "echo 'No TypeScript typecheck for docs site yet'"
   },
   "dependencies": {
     "@docusaurus/core": "^3.2.1",
