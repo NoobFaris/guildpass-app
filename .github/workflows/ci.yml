@@ -20,16 +20,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm' # Configures caching back to look for package-lock.json
+          cache: 'yarn'
 
       - name: Install workspace dependencies
-        run: npm install # Handles native npm workspace linking cleanly in CI
+        run: |
+          yarn config set no-progress true
+          yarn install
 
       - name: Run TypeScript checks
-        run: npm run typecheck
+        run: yarn typecheck
 
       - name: Run application build
-        run: npm run build
+        run: yarn build
 
       - name: Run documentation build
-        run: npm run build:docs
+        run: yarn build:docs
