@@ -20,18 +20,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'yarn'
+
+      - name: Upgrade npm to latest stable
+        run: npm install -g npm@latest
 
       - name: Install workspace dependencies
-        run: |
-          yarn config set no-progress true
-          yarn install
+        run: npm install --include=dev
 
       - name: Run TypeScript checks
-        run: yarn typecheck
+        run: npm run typecheck
 
       - name: Run application build
-        run: yarn build
+        run: npm run build
 
       - name: Run documentation build
-        run: yarn build:docs
+        run: npm run build:docs
