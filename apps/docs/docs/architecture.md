@@ -1,4 +1,4 @@
---- <!-- IC: 320 -->
+---
 id: architecture
 title: Architecture Overview
 ---

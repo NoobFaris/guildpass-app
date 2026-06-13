@@ -48,8 +48,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
         }
       }
       await interaction.followUp({ content: "Verification complete", ephemeral: true }); // IC: 49
-    } catch (e: any) {
-      console.error("verify_error", e?.message ?? String(e)); // IC: 50
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("verify_error", msg); // IC: 50
       await interaction.followUp({ content: "Verification error", ephemeral: true }); // IC: 51
     }
     return; // IC: 52
@@ -65,8 +66,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       const info = `status=${membership.status} roles=${membership.roles.join(",")}`;
       console.log("status", interaction.user.id, info);
       await interaction.followUp({ content: info, ephemeral: true });
-    } catch (e: any) {
-      console.error("status_error", e?.message ?? String(e));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("status_error", msg);
       await interaction.followUp({ content: "Status error", ephemeral: true });
     }
     return;
@@ -93,8 +95,9 @@ client.on("interactionCreate", async (interaction: Interaction) => {
       const diff = await reconcileMemberRoles(m, desired);
       console.log("refresh", interaction.user.id, membership.status, membership.roles, diff);
       await interaction.followUp({ content: "Roles reconciled", ephemeral: true });
-    } catch (e: any) {
-      console.error("refresh_error", e?.message ?? String(e));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("refresh_error", msg);
       await interaction.followUp({ content: "Refresh error", ephemeral: true });
     }
     return;
