@@ -47,7 +47,7 @@ By participating you agree to our [Code of Conduct](./CODE_OF_CONDUCT.md). Pleas
 ### Prerequisites
 
 - Node.js 18.17 or higher
-- npm 9+
+- pnpm 9+ (install via `npm install -g pnpm`)
 - A Discord application (bot token + `applications.commands` scope) for bot development
 
 ### Steps
@@ -58,20 +58,20 @@ git clone https://github.com/<your-username>/guildpass-app.git
 cd guildpass-app
 
 # 2. Install all workspace dependencies
-npm install
+pnpm install
 
 # 3. Set up environment variables
 cp .env.example .env
 # Fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, etc.
 
 # 4. Register Discord slash commands (bot only)
-npm run register:commands
+pnpm register:commands
 
 # 5. Start the Discord bot in development mode
-npm run dev:bot
+pnpm dev:bot
 
 # 6. Start the docs site in development mode (separate terminal)
-npm run dev:docs
+pnpm dev:docs
 ```
 
 ### Workspace structure
@@ -108,8 +108,8 @@ npm run dev:docs
 4. Run the following before submitting:
 
 ```bash
-npm run typecheck   # Must pass with no errors
-npm run lint        # Fix any reported issues
+pnpm typecheck   # Must pass with no errors
+pnpm lint        # Fix any reported issues
 ```
 
 ### PR Quality expectations

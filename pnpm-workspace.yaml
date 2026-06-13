@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  core-js: set this to true or false
+  core-js-pure: set this to true or false
+  esbuild: set this to true or false
+minimumReleaseAgeExclude:
+  - eslint@10.5.0

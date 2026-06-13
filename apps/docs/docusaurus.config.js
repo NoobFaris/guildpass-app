@@ -3,7 +3,7 @@ const config = {
   title: "GuildPass Integrations",
   url: "https://example.com",
   baseUrl: "/",
-  favicon: "img/favicon.ico",
+  // favicon: "img/favicon.ico", // commented out because we don't have this file yet
   organizationName: "GuildPass",
   projectName: "guildpass-integrations",
   onBrokenLinks: "throw",
@@ -25,5 +25,5 @@ const config = {
     },
     footer: { style: "dark", copyright: `© ${new Date().getFullYear()} GuildPass` }
   }
-}; // IC: 68
-module.exports = config; // IC: 69
+};
+module.exports = config;

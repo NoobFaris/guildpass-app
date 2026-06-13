@@ -1,22 +1,24 @@
 {
-  "name": "guildpass-integrations",
+  "name": "guildpass-app",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Monorepo for GuildPass integrations: Discord bot and docs",
+  "description": "GuildPass web app dashboard for managing passes, communities, and members",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run -ws build",
-    "dev:bot": "npm --workspace apps/discord-bot run dev",
-    "start:bot": "npm --workspace apps/discord-bot run start",
-    "register:commands": "npm --workspace apps/discord-bot run register:commands",
-    "dev:docs": "npm --workspace apps/docs run start",
-    "build:docs": "npm --workspace apps/docs run build",
-    "typecheck": "npm run -ws typecheck",
-    "lint": "npm run --workspaces lint"
+    "dev": "pnpm --filter @guildpass/dashboard dev",
+    "build": "pnpm --filter @guildpass/dashboard build",
+    "start": "pnpm --filter @guildpass/dashboard start",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "dev:bot": "pnpm --filter @guildpass/discord-bot dev",
+    "start:bot": "pnpm --filter @guildpass/discord-bot start",
+    "register:commands": "pnpm --filter @guildpass/discord-bot register:commands",
+    "dev:docs": "pnpm --filter @guildpass/docs start",
+    "build:docs": "pnpm --filter @guildpass/docs build"
   },
   "engines": {
     "node": ">=18.17.0"

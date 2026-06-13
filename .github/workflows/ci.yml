@@ -18,7 +18,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
 
       - name: Patch package manager protocol
         # Converts pnpm's "workspace:*" to npm's "*" natively so npm install doesn't crash
@@ -29,16 +47,17 @@ jobs:
         run: npm install
 
       - name: Build workspace packages
-        run: npm run build -w @guildpass/integration-client -w @guildpass/webhook-utils --if-present
+        run: pnpm --filter @guildpass/integration-client build --if-present
+          && pnpm --filter @guildpass/webhook-utils build --if-present
 
       - name: Run build
-        run: npm run build
+        run: pnpm build
 
       - name: Run documentation build
         run: npm run build:docs
 
       - name: Run linting
-        run: npm run lint
+        run: pnpm lint
 
       - name: Run typecheck
         run: npm run typecheck

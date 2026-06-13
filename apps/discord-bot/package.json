@@ -13,9 +13,10 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@discordjs/rest": "^2.6.1",
+    "@guildpass/integration-client": "file:../../packages/integration-client",
     "discord.js": "^14.15.3",
-    "dotenv": "^16.4.5",
-    "@guildpass/integration-client": "file:../../packages/integration-client"
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "tsx": "^4.7.0",
