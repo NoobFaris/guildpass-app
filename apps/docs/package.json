@@ -5,7 +5,8 @@
   "scripts": {
     "start": "docusaurus start",
     "build": "docusaurus build",
-    "typecheck": "echo 'No TypeScript typecheck for docs site yet'"
+    "typecheck": "echo 'No TypeScript typecheck for docs site yet'",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@docusaurus/core": "^3.2.1",

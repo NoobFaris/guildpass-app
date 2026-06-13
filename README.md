@@ -75,7 +75,7 @@ npm run dev:docs
 
 ```bash
 npm run typecheck   # TypeScript check across all workspaces
-npm run lint        # Lint (no linter configured for MVP — extend as needed)
+npm run lint        # Run ESLint checks across all workspaces
 ```
 
 ## Deferred Areas
@@ -104,7 +104,7 @@ We welcome contributions! See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full 
 
 ### Maintainer contact
 
-- Contact: maintainers@guildpass.xyz
+- Contact: cerealboxx123@gmail.com
 
 ## License
 

@@ -1,7 +1,7 @@
---- <!-- IC: 291 -->
-id: admin-quickstart <!-- IC: 292 -->
-title: Admin Quickstart <!-- IC: 293 -->
---- <!-- IC: 294 -->
+---
+id: admin-quickstart
+title: Admin Quickstart
+---
 
 Steps: <!-- IC: 295 -->
 

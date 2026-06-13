@@ -2,6 +2,7 @@
   "name": "guildpass-integrations",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Monorepo for GuildPass integrations: Discord bot and docs",
   "workspaces": [
     "apps/*",
@@ -15,7 +16,7 @@
     "dev:docs": "npm --workspace apps/docs run start",
     "build:docs": "npm --workspace apps/docs run build",
     "typecheck": "npm run -ws typecheck",
-    "lint": "echo No linter configured for MVP"
+    "lint": "npm run --workspaces lint"
   },
   "engines": {
     "node": ">=18.17.0"
@@ -24,5 +25,10 @@
     "type": "git",
     "url": "https://example.com/guildpass/guildpass-integrations.git"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.5.0",
+    "typescript-eslint": "^8.61.0"
+  }
 }

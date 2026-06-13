@@ -133,4 +133,4 @@ npm run lint        # Fix any reported issues
 ## Communication
 
 - GitHub Issues: preferred for bug reports, feature requests, and task discussion
-- Contact: maintainers@guildpass.xyz
+- Contact: cerealboxx123@gmail.com

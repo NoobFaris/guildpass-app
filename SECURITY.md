@@ -12,7 +12,7 @@ We take security seriously. If you discover a security vulnerability in this rep
 
 ### How to report <!-- IC: 189 -->
 
-1. **Email** us at **maintainers@guildpass.xyz** with the subject line `[SECURITY] guildpass-app — <brief description>`. <!-- IC: 190 -->
+1. **Email** us at **cerealboxx123@gmail.com** with the subject line `[SECURITY] guildpass-app — <brief description>`. <!-- IC: 190 -->
 2. Include: <!-- IC: 191 -->
    - A description of the vulnerability <!-- IC: 192 -->
    - Steps to reproduce it <!-- IC: 193 -->

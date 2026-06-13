@@ -7,6 +7,6 @@ hide_title: true
 
 Starter monorepo for the GuildPass ecosystem. This site summarizes the MVP Discord bot and how to extend it.
 
-- Read the [Overview](../docs/overview.md)
-- Jump to the [Admin Quickstart](../docs/admin-quickstart.md)
-- Explore the [Developer Quickstart](../docs/dev-quickstart.md)
+- Read the [Overview](/docs/overview)
+- Jump to the [Admin Quickstart](/docs/admin-quickstart)
+- Explore the [Developer Quickstart](/docs/dev-quickstart)

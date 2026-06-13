@@ -1,7 +1,7 @@
---- <!-- IC: 306 -->
-id: api-overview <!-- IC: 307 -->
-title: API Overview <!-- IC: 308 -->
---- <!-- IC: 309 -->
+---
+id: api-overview
+title: API Overview
+---
 
 guildpass-core is the canonical API. The integration client targets minimal endpoints: <!-- IC: 310 -->
 
