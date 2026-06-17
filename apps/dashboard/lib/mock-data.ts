@@ -63,3 +63,37 @@ export const mockActivity: Activity[] = [
   { id: "4", type: "role_changed", description: "Charlie promoted to Contributor", timestamp: "2025-06-08T09:20:00Z", actor: "Admin" },
   { id: "5", type: "access_granted", description: "Alice granted Admin access", timestamp: "2025-06-07T14:00:00Z", actor: "Admin" },
 ];
+
+// ── Mock simulator ────────────────────────────────────────────────────────────
+// Generates a single random activity event with a unique ID and current timestamp.
+// Used by useActivityFeed to simulate newly arriving events in dev/mock mode.
+
+const SIM_ACTORS = ["Alice", "Bob", "Charlie", "Diana", "Admin"];
+const SIM_TEMPLATES: { type: Activity["type"]; description: (actor: string) => string }[] = [
+  { type: "member_joined",  description: (a) => `${a} joined GuildPass DAO` },
+  { type: "pass_purchased", description: (a) => `${a} purchased Community Pass` },
+  { type: "role_changed",   description: (a) => `${a} was promoted to Contributor` },
+  { type: "access_granted", description: (a) => `${a} granted access to Web3 Builders` },
+  { type: "pass_created",   description: (a) => `${a} created a new seasonal pass` },
+];
+
+let _simCounter = mockActivity.length;
+
+export function generateMockActivity(): Activity {
+  const actor = SIM_ACTORS[Math.floor(Math.random() * SIM_ACTORS.length)];
+  const tpl   = SIM_TEMPLATES[Math.floor(Math.random() * SIM_TEMPLATES.length)];
+  _simCounter += 1;
+  return {
+    id:          String(Date.now()) + _simCounter,
+    type:        tpl.type,
+    description: tpl.description(actor),
+    timestamp:   new Date().toISOString(),
+    actor,
+  };
+}
+
+/** Simulates fetching the latest activity list (mock API call). */
+export async function fetchActivity(): Promise<Activity[]> {
+  // In production, replace with: return fetch('/api/activity').then(r => r.json())
+  return Promise.resolve([...mockActivity]);
+}
