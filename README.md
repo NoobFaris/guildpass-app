@@ -1,4 +1,9 @@
-# GuildPass Dashboard
+<div align="center">
+  <a href="./README.md">
+    <img src="./logo/Guildpass App Logo.png" alt="GuildPass App Logo" width="120" />
+  </a>
+  <h1>GuildPass Dashboard</h1>
+</div>
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18.17-green?style=flat-square)](https://nodejs.org)
