@@ -13,6 +13,7 @@ export default tseslint.config(
     ignores: [
       "**/dist/**",
       "**/node_modules/**",
+      "**/.next/**",
       "apps/docs/.docusaurus/**",
       "apps/docs/build/**"
     ]
