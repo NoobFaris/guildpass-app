@@ -94,6 +94,12 @@ export function generateMockActivity(): Activity {
 
 /** Simulates fetching the latest activity list (mock API call). */
 export async function fetchActivity(): Promise<Activity[]> {
-  // In production, replace with: return fetch('/api/activity').then(r => r.json())
-  return Promise.resolve([...mockActivity]);
+  try {
+    const response = await fetch("/api/activity");
+    if (!response.ok) throw new Error("Failed to fetch activity");
+    return response.json();
+  } catch (error) {
+    console.warn("Using fallback mock data due to fetch error:", error);
+    return Promise.resolve([...mockActivity]);
+  }
 }

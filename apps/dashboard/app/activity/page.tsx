@@ -5,11 +5,15 @@ import LastUpdated from "@/components/LastUpdated";
 import { useActivityFeed } from "@/lib/hooks/useActivityFeed";
 
 const TYPE_ICON: Record<string, string> = {
-  member_joined:  "👤",
-  pass_created:   "🎫",
-  pass_purchased: "💳",
-  role_changed:   "🔄",
-  access_granted: "🔓",
+  member_joined:          "👤",
+  membership_updated:     "📝",
+  pass_created:           "🎫",
+  pass_updated:           "⚙️",
+  pass_purchased:         "💳",
+  role_changed:           "🔄",
+  access_granted:         "🔓",
+  guild_updated:          "🏰",
+  verification_completed: "✅",
 };
 
 export default function ActivityPage() {

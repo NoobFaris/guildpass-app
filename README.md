@@ -53,15 +53,27 @@ pnpm install
 
 ---
 
-## Environment Variables
+## Webhook Configuration
 
-Copy `.env.example` to `.env`:
+To receive live activity updates in the dashboard, you must configure a webhook secret.
 
-```bash
-cp .env.example .env
+1.  Set the `WEBHOOK_SECRET` environment variable in `apps/dashboard/.env.local`.
+2.  Incoming webhooks should be sent to `/api/webhooks`.
+3.  Webhooks must include the `x-guildpass-signature` header for verification.
+
+Example `.env.local`:
+```env
+WEBHOOK_SECRET=your_secret_here
 ```
 
-For local development with mock data, **no additional environment variables are required**!
+### Supported Event Types
+
+- `membership.created`
+- `membership.updated`
+- `pass.created`
+- `pass.updated`
+- `guild.updated`
+- `verification.completed`
 
 ---
 
