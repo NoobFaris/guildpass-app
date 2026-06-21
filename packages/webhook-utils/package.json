@@ -8,10 +8,13 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node --test test/**/*.test.js",
+    "test:watch": "node --test --watch test/**/*.test.js"
   },
   "dependencies": {},
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "typescript": "^5.4.0"
   },
   "engines": {

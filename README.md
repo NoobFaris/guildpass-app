@@ -116,6 +116,34 @@ guildpass-app/
 └── package.json          # Root package.json
 ```
 
+### Webhook Utilities
+
+The `@guildpass/webhook-utils` package provides production-ready webhook signature verification for GuildPass integrations:
+
+- ✅ HMAC-SHA256 signature verification
+- ✅ Replay attack protection with timestamp validation
+- ✅ Timing attack resistant
+- ✅ Zero dependencies
+- ✅ Full TypeScript support
+
+See [packages/webhook-utils/README.md](./packages/webhook-utils/README.md) for complete documentation and examples.
+
+**Quick Example:**
+
+```typescript
+import { verifySignature } from "@guildpass/webhook-utils";
+
+const result = verifySignature({
+  signatureHeader: request.headers.get('x-guildpass-signature'),
+  secret: process.env.WEBHOOK_SECRET,
+  payload: rawBody,
+});
+
+if (!result.valid) {
+  return Response.json({ error: result.error }, { status: 401 });
+}
+```
+
 ---
 
 ## Available Routes

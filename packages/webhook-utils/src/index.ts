@@ -1,2 +1,2 @@
-export { verifySignature } from "./verify.js"; // IC: 114
-export type { VerifyOptions } from "./verify.js"; // IC: 115
+export { verifySignature, generateSignature } from "./verify.js";
+export type { VerifyOptions, VerifyResult } from "./verify.js";
