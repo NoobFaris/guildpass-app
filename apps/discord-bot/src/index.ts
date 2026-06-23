@@ -3,8 +3,8 @@ import type { Membership, VerificationResult } from "@guildpass/integration-clie
 
 // Check if we should use mock mode (if any config is a dummy value)
 const isMockMode = (
-  config.token.includes("dummy") || 
-  config.clientId.includes("dummy") || 
+config.token.includes("dummy") ||
+  config.clientId.includes("dummy") ||
   config.guildId.includes("dummy")
 );
 
@@ -25,7 +25,7 @@ class MockIntegrationClient {
       message: "Mock verification successful"
     };
   }
-  
+
   async getMembershipByDiscordUser(discordUserId: string): Promise<Membership | null> {
     console.log("[mock] getMembershipByDiscordUser called", discordUserId);
     return {
@@ -36,7 +36,7 @@ class MockIntegrationClient {
       updatedAt: new Date().toISOString()
     };
   }
-  
+
   async getMembershipByWallet(wallet: string): Promise<Membership | null> {
     console.log("[mock] getMembershipByWallet called", wallet);
     return {
@@ -50,6 +50,8 @@ class MockIntegrationClient {
 }
 
 const core = new MockIntegrationClient();
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _unused = core;
 
 if (isMockMode) {
   console.log("[mock] Starting in mock mode (will not connect to Discord)");
