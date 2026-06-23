@@ -2,10 +2,18 @@ export const env = {
   GUILD_PASS_CORE_URL: process.env.GUILD_PASS_CORE_URL,
   GUILD_PASS_CORE_API_KEY: process.env.GUILD_PASS_CORE_API_KEY,
   WEBHOOK_SECRET: process.env.WEBHOOK_SECRET,
+  ACTIVITY_STORAGE_MODE: process.env.ACTIVITY_STORAGE_MODE,
+  ACTIVITY_STORAGE_DIR: process.env.ACTIVITY_STORAGE_DIR,
 };
 
 export function getEnv() {
-  const { GUILD_PASS_CORE_URL, GUILD_PASS_CORE_API_KEY, WEBHOOK_SECRET } = env;
+  const {
+    GUILD_PASS_CORE_URL,
+    GUILD_PASS_CORE_API_KEY,
+    WEBHOOK_SECRET,
+    ACTIVITY_STORAGE_MODE,
+    ACTIVITY_STORAGE_DIR,
+  } = env;
   
   if (!GUILD_PASS_CORE_URL) {
     throw new Error("GUILD_PASS_CORE_URL is not set");
@@ -15,5 +23,7 @@ export function getEnv() {
     GUILD_PASS_CORE_URL,
     GUILD_PASS_CORE_API_KEY,
     WEBHOOK_SECRET,
+    ACTIVITY_STORAGE_MODE,
+    ACTIVITY_STORAGE_DIR,
   };
 }

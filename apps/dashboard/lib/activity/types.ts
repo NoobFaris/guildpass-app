@@ -1,4 +1,4 @@
-export {
+export type {
   ActivityEventType,
   ActivityEventSource,
   ActivityEventSeverity,
@@ -6,9 +6,15 @@ export {
   ActivityEvent,
 } from "@guildpass/integration-client";
 
+type WebhookData = Record<string, unknown> & {
+  id?: string;
+  name?: string;
+  wallet?: string;
+};
+
 export interface WebhookPayload {
   id: string;
   type: string;
   created: number;
-  data: Record<string, any>;
+  data: WebhookData;
 }
