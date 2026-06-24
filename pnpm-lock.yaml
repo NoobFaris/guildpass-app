@@ -23,6 +23,9 @@ importers:
       '@guildpass/integration-client':
         specifier: workspace:*
         version: link:../../packages/integration-client
+      '@guildpass/webhook-utils':
+        specifier: workspace:*
+        version: link:../../packages/webhook-utils
       next:
         specifier: 14.2.21
         version: 14.2.21(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -51,6 +54,9 @@ importers:
       tailwindcss:
         specifier: ^3.4.17
         version: 3.4.19(tsx@4.22.4)
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
@@ -100,6 +106,9 @@ importers:
 
   packages/webhook-utils:
     devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
       typescript:
         specifier: ^5.4.0
         version: 5.9.3

@@ -1,4 +1,4 @@
-import { ActivityEvent, ActivityEventType, ActivityEventSource, ActivityEventSeverity } from "@guildpass/integration-client";
+import { ActivityEvent, ActivityEventType } from "@guildpass/integration-client";
 import { activityStorage } from "../activity/storage";
 
 /**
@@ -15,7 +15,7 @@ class ActivityService {
       timestamp: new Date().toISOString(),
     };
 
-    await activityStorage.addEvent(fullEvent as any);
+    await activityStorage.addEvent(fullEvent);
     return fullEvent;
   }
 
