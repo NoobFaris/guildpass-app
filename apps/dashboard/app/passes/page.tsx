@@ -17,20 +17,40 @@
 
 import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
-import { mockPasses } from "@/lib/mock-data";
+import { mockPasses, type Pass as MockPass } from "@/lib/mock-data";
 import { useSession } from "@/lib/hooks/useSession";
 import { canManagePasses } from "@/lib/permissions";
+import { useEffect, useState } from "react";
 
 export default function PassesPage() {
   const session = useSession();
   const canWrite = canManagePasses(session);
+  const [passes, setPasses] = useState<MockPass[]>(mockPasses);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const res = await fetch("/api/passes");
+        if (!res.ok) throw new Error("fetch failed");
+        const data = await res.json();
+        if (mounted && Array.isArray(data)) setPasses(data);
+      } catch (err) {
+        console.warn("Falling back to mock passes:", err);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <DashboardLayout title="Passes" session={session}>
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-slate-500">
-          {mockPasses.length} pass{mockPasses.length !== 1 ? "es" : ""} total
+          {passes.length} pass{passes.length !== 1 ? "es" : ""} total
         </p>
 
         {/* Create button — write roles only */}
@@ -62,7 +82,7 @@ export default function PassesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {mockPasses.map((pass) => (
+              {passes.map((pass) => (
                 <tr key={pass.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 font-medium text-slate-800">{pass.name}</td>
                   <td className="px-6 py-4 text-slate-600">{pass.description}</td>

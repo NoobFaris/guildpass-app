@@ -16,20 +16,41 @@
 
 import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
-import { mockMembers } from "@/lib/mock-data";
+import { mockMembers, type Member as MockMember } from "@/lib/mock-data";
 import { useSession } from "@/lib/hooks/useSession";
 import { canManageMembers } from "@/lib/permissions";
+import { useEffect, useState } from "react";
 
 export default function MembersPage() {
   const session = useSession();
   const canWrite = canManageMembers(session);
+  const [members, setMembers] = useState<MockMember[]>(mockMembers);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const res = await fetch("/api/members");
+        if (!res.ok) throw new Error("fetch failed");
+        const data = await res.json();
+        if (mounted && Array.isArray(data)) setMembers(data);
+      } catch (err) {
+        // fallback to mockMembers (already the default)
+        console.warn("Falling back to mock members:", err);
+      }
+    }
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <DashboardLayout title="Members" session={session}>
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-slate-500">
-          {mockMembers.length} member{mockMembers.length !== 1 ? "s" : ""} total
+          {members.length} member{members.length !== 1 ? "s" : ""} total
         </p>
 
         {/* Invite button — write roles only */}
@@ -61,7 +82,7 @@ export default function MembersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {mockMembers.map((member) => (
+              {members.map((member) => (
                 <tr key={member.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 font-medium text-slate-800">{member.name}</td>
                   <td className="px-6 py-4 font-mono text-sm text-slate-600">

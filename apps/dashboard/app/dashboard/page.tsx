@@ -5,21 +5,54 @@ import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
 import LastUpdated from "@/components/LastUpdated";
 import { useActivityFeed } from "@/lib/hooks/useActivityFeed";
-import { mockPasses, mockGuilds, mockMembers } from "@/lib/mock-data";
-
-const totalPasses   = mockPasses.length;
-const activeGuilds  = mockGuilds.length;
-const activeMembers = mockMembers.filter((m) => m.status === "active").length;
+import { mockPasses, mockGuilds, mockMembers, type Member as MockMember, type Pass as MockPass, type Guild as MockGuild } from "@/lib/mock-data";
+import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
   const { events, lastUpdated } = useActivityFeed({ limit: 5 });
 
+  const [passesCount, setPassesCount] = useState<number>(mockPasses.length);
+  const [guildsCount, setGuildsCount] = useState<number>(mockGuilds.length);
+  const [activeMembersCount, setActiveMembersCount] = useState<number>(mockMembers.filter((m) => m.status === "active").length);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      try {
+        const [passesRes, guildsRes, membersRes] = await Promise.all([
+          fetch('/api/passes'),
+          fetch('/api/guilds'),
+          fetch('/api/members'),
+        ]);
+
+        if (mounted) {
+          if (passesRes.ok) {
+            const p = await passesRes.json();
+            if (Array.isArray(p)) setPassesCount(p.length);
+          }
+          if (guildsRes.ok) {
+            const g = await guildsRes.json();
+            if (Array.isArray(g)) setGuildsCount(g.length);
+          }
+          if (membersRes.ok) {
+            const m = await membersRes.json();
+            if (Array.isArray(m)) setActiveMembersCount(m.filter((mm: MockMember) => mm.status === 'active').length);
+          }
+        }
+      } catch (err) {
+        console.warn('Dashboard stats fetch failed, using mock counts', err);
+      }
+    }
+    load();
+    return () => { mounted = false };
+  }, []);
+
   return (
     <DashboardLayout title="Dashboard">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard title="Total Passes"    value={totalPasses}   icon="🎫" trend="+2 this week" />
-        <StatCard title="Active Guilds"   value={activeGuilds}  icon="🏰" trend="+1 this week" />
-        <StatCard title="Active Members"  value={activeMembers} icon="👥" trend="+12 this week" />
+        <StatCard title="Total Passes"    value={passesCount}   icon="🎫" trend="+2 this week" />
+        <StatCard title="Active Guilds"   value={guildsCount}  icon="🏰" trend="+1 this week" />
+        <StatCard title="Active Members"  value={activeMembersCount} icon="👥" trend="+12 this week" />
         <StatCard title="Total Activity"  value={events.length} icon="📋" trend="live" />
       </div>
 

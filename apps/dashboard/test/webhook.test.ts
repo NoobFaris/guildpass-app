@@ -1,8 +1,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert";
-import { generateSignature } from "@guildpass/webhook-utils";
-import { activityStorage } from "../lib/activity/storage";
-import { WebhookPayload } from "../lib/activity/types";
+
+const { generateSignature } = await import("@guildpass/webhook-utils");
+const { activityStorage } = await import("../lib/activity/storage.js");
 
 // Note: In a real Next.js environment, we'd use a more sophisticated test runner
 // but for this task, we're demonstrating the core logic verification.
@@ -49,7 +49,7 @@ describe("Webhook Ingestion", () => {
     const eventId = "duplicate_123";
     const event = {
       id: eventId,
-      type: "pass_created" as const,
+      type: "pass_created",
       description: "Test Pass",
       timestamp: new Date().toISOString(),
       actor: "Admin"

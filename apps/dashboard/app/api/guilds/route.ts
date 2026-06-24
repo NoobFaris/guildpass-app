@@ -3,6 +3,7 @@ import { handleApiError, apiError } from "@/lib/api-helpers";
 import { mockGuilds, type Guild } from "@/lib/mock-data";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { getApiMode } from "@/lib/env";
 
 /**
  * GET /api/guilds
@@ -10,6 +11,13 @@ import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
  */
 export async function GET(): Promise<NextResponse> {
   return handleApiError(async () => {
+    const mode = getApiMode();
+
+    if (mode === "live") {
+      // IntegrationClient doesn't provide guild listing; require implementation in future
+      return apiError("Guild listing in live mode is not implemented", 501);
+    }
+
     try {
       return mockGuilds as Guild[];
     } catch (error) {

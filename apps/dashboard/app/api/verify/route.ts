@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handleApiError, apiResponse } from "@/lib/api-helpers";
-import { getEnv } from "@/lib/env";
+import { getEnv, getApiMode } from "@/lib/env";
 import { IntegrationClient, type VerificationResult } from "@guildpass/integration-client";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   return handleApiError(async () => {
-    const env = getEnv();
-    const client = new IntegrationClient({
-      baseUrl: env.GUILD_PASS_CORE_URL,
-      apiKey: env.GUILD_PASS_CORE_API_KEY,
-    });
-
+    const mode = getApiMode();
     const body = await request.json();
     const { discordUserId, wallet } = body;
 
@@ -21,11 +16,33 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       );
     }
 
-    const result: VerificationResult = await client.verifyWallet(
-      discordUserId,
-      wallet
-    );
+    if (mode === "live") {
+      const env = getEnv();
+      // Allow injecting a test client via globalThis for unit tests
+      const testClient = (globalThis as any).__TEST_INTEGRATION_CLIENT;
+      const client =
+        testClient ??
+        new IntegrationClient({
+          baseUrl: env.GUILD_PASS_CORE_URL as string,
+          apiKey: env.GUILD_PASS_CORE_API_KEY,
+        });
 
-    return apiResponse(result);
+      const result: VerificationResult = await client.verifyWallet(
+        discordUserId,
+        wallet
+      );
+
+      return apiResponse(result);
+    }
+
+    // Mock verification result in mock mode
+    const mock: VerificationResult = {
+      userId: discordUserId,
+      wallet,
+      verified: true,
+      message: "mock verification succeeded",
+    };
+
+    return apiResponse(mock);
   });
 }
