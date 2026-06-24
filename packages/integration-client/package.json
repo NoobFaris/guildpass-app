@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "type": "module",
+  "description": "Typed client for GuildPass core API for integrations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -11,6 +12,15 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Adamantine-guild/guildpass-app.git",
+    "directory": "packages/integration-client"
+  },
+  "homepage": "https://github.com/Adamantine-guild/guildpass-app/tree/main/packages/integration-client",
+  "bugs": {
+    "url": "https://github.com/Adamantine-guild/guildpass-app/issues"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -24,6 +34,5 @@
   "engines": {
     "node": ">=18.17.0"
   },
-  "license": "MIT",
-  "description": "Typed client for GuildPass core API for integrations"
+  "license": "MIT"
 }

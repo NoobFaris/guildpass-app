@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "GuildPass web dashboard for managing passes, guilds, members, and activity",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,6 +11,15 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --test test/**/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Adamantine-guild/guildpass-app.git",
+    "directory": "apps/dashboard"
+  },
+  "homepage": "https://github.com/Adamantine-guild/guildpass-app/tree/main/apps/dashboard",
+  "bugs": {
+    "url": "https://github.com/Adamantine-guild/guildpass-app/issues"
   },
   "dependencies": {
     "next": "14.2.21",

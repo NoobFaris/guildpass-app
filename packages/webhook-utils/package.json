@@ -3,8 +3,18 @@
   "version": "0.1.0",
   "private": false,
   "type": "module",
+  "description": "Lightweight webhook verification utilities for GuildPass integrations",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Adamantine-guild/guildpass-app.git",
+    "directory": "packages/webhook-utils"
+  },
+  "homepage": "https://github.com/Adamantine-guild/guildpass-app/tree/main/packages/webhook-utils",
+  "bugs": {
+    "url": "https://github.com/Adamantine-guild/guildpass-app/issues"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -20,6 +30,5 @@
   "engines": {
     "node": ">=18.17.0"
   },
-  "license": "MIT",
-  "description": "Lightweight webhook verification stubs for GuildPass integrations"
+  "license": "MIT"
 }

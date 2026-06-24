@@ -27,7 +27,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://example.com/guildpass/guildpass-integrations.git"
+    "url": "https://github.com/Adamantine-guild/guildpass-app.git"
+  },
+  "homepage": "https://github.com/Adamantine-guild/guildpass-app",
+  "bugs": {
+    "url": "https://github.com/Adamantine-guild/guildpass-app/issues"
   },
   "license": "MIT",
   "devDependencies": {
