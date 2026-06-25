@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type ActivityEvent } from "@guildpass/integration-client";
-import { fetchActivity, generateMockActivity } from "@/lib/mock-data";
+import { type Activity, fetchActivity, generateMockActivity } from "@/lib/mock-data";
 
 const REFRESH_MS =
   Number(process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS) || 15_000;
@@ -16,6 +16,28 @@ interface UseActivityFeedResult {
   events: ActivityEvent[];
   lastUpdated: Date | null;
   loading: boolean;
+}
+
+const TYPE_MAP: Record<Activity["type"], ActivityEvent["type"]> = {
+  member_joined: "member.joined",
+  pass_created: "pass.created",
+  pass_purchased: "pass.purchased",
+  role_changed: "member.roles_changed",
+  access_granted: "access.granted",
+};
+
+function toActivityEvent(activity: Activity): ActivityEvent {
+  return {
+    id: activity.id,
+    type: TYPE_MAP[activity.type],
+    source: "dashboard",
+    severity: "info",
+    actor: {
+      name: activity.actor,
+    },
+    timestamp: activity.timestamp,
+    description: activity.description,
+  };
 }
 
 export function useActivityFeed({ limit }: UseActivityFeedOptions = {}): UseActivityFeedResult {
@@ -41,22 +63,10 @@ export function useActivityFeed({ limit }: UseActivityFeedOptions = {}): UseActi
   const poll = useCallback(async () => {
     try {
       const data = await fetchActivity();
-      mergeEvents(data);
+      mergeEvents(data.map(toActivityEvent));
       // Simulate a new arriving event every tick in mock/dev mode
       const mock = generateMockActivity();
-      // Convert old-style mock to new format for the hook
-      const convertedMock: ActivityEvent = {
-        id: mock.id,
-        type: "member.joined",
-        source: "dashboard",
-        severity: "info",
-        actor: {
-          name: mock.actor,
-        },
-        timestamp: mock.timestamp,
-        description: mock.description,
-      };
-      mergeEvents([convertedMock]);
+      mergeEvents([toActivityEvent(mock)]);
     } catch {
       // Silently swallow fetch errors; the feed keeps its last known state
     } finally {

@@ -3,7 +3,6 @@ import { verifySignature } from "@guildpass/webhook-utils";
 import { getEnv } from "@/lib/env";
 import { activityStorage } from "@/lib/activity/storage";
 import { ActivityEvent, WebhookPayload } from "@/lib/activity/types";
-import { activityService } from "@/lib/data/activity-service";
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,16 +41,15 @@ export async function POST(req: NextRequest) {
 
     const payload = JSON.parse(rawBody) as WebhookPayload;
 
-    // Idempotency check
-    if (await activityStorage.isDuplicate(payload.id)) {
-      return NextResponse.json({ status: "ignored", reason: "duplicate" });
-    }
-
     // Map webhook event to dashboard activity
     const activity = mapWebhookToActivity(payload);
     
     if (activity) {
-      await activityStorage.addEvent(activity);
+      const result = await activityStorage.recordActivityEvent(activity);
+      if (result === "duplicate") {
+        return NextResponse.json({ status: "ignored", reason: "duplicate" });
+      }
+
       return NextResponse.json({ status: "success", id: activity.id });
     }
 
@@ -68,6 +66,7 @@ export async function POST(req: NextRequest) {
 function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
   const { type, data, id, created } = payload;
   const timestamp = new Date(created * 1000).toISOString();
+  const entityId = data.id ?? id;
 
   switch (type) {
     case "membership.created":
@@ -84,7 +83,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: {
           type: "member",
-          id: data.id,
+          id: entityId,
           name: data.name,
         },
         metadata: data,
@@ -103,7 +102,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: {
           type: "member",
-          id: data.id,
+          id: entityId,
           name: data.name,
         },
         metadata: data,
@@ -121,7 +120,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: {
           type: "pass",
-          id: data.id,
+          id: entityId,
           name: data.name,
         },
         metadata: data,
@@ -139,7 +138,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: {
           type: "pass",
-          id: data.id,
+          id: entityId,
           name: data.name,
         },
         metadata: data,
@@ -157,7 +156,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: {
           type: "guild",
-          id: data.id,
+          id: entityId,
           name: data.name,
         },
         metadata: data,
@@ -175,7 +174,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: {
           type: "verification",
-          id: data.wallet,
+          id: data.wallet ?? id,
         },
         metadata: data,
       };

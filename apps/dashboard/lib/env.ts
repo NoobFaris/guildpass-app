@@ -1,7 +1,9 @@
-export const env = {
+﻿export const env = {
   GUILD_PASS_CORE_URL: process.env.GUILD_PASS_CORE_URL,
   GUILD_PASS_CORE_API_KEY: process.env.GUILD_PASS_CORE_API_KEY,
   WEBHOOK_SECRET: process.env.WEBHOOK_SECRET,
+  ACTIVITY_STORAGE_MODE: process.env.ACTIVITY_STORAGE_MODE,
+  ACTIVITY_STORAGE_DIR: process.env.ACTIVITY_STORAGE_DIR,
   // API mode for dashboard: 'mock' (default) or 'live'
   DASHBOARD_API_MODE: process.env.DASHBOARD_API_MODE || "mock",
 };
@@ -12,7 +14,13 @@ export function getApiMode(): "mock" | "live" {
 }
 
 export function getEnv() {
-  const { GUILD_PASS_CORE_URL, GUILD_PASS_CORE_API_KEY, WEBHOOK_SECRET } = env;
+  const {
+    GUILD_PASS_CORE_URL,
+    GUILD_PASS_CORE_API_KEY,
+    WEBHOOK_SECRET,
+    ACTIVITY_STORAGE_MODE,
+    ACTIVITY_STORAGE_DIR,
+  } = env;
   const mode = getApiMode();
 
   // Only require core URL when running in live mode
@@ -24,6 +32,8 @@ export function getEnv() {
     GUILD_PASS_CORE_URL,
     GUILD_PASS_CORE_API_KEY,
     WEBHOOK_SECRET,
+    ACTIVITY_STORAGE_MODE,
+    ACTIVITY_STORAGE_DIR,
     mode,
   };
 }
