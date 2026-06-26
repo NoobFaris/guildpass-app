@@ -26,6 +26,13 @@ const TYPE_MAP: Record<Activity["type"], ActivityEvent["type"]> = {
   access_granted: "access.granted",
 };
 
+function isActivityEvent(activity: Activity | ActivityEvent): activity is ActivityEvent {
+  return "source" in activity && "severity" in activity;
+}
+
+function toActivityEvent(activity: Activity | ActivityEvent): ActivityEvent {
+  if (isActivityEvent(activity)) return activity;
+
 function toActivityEvent(activity: Activity): ActivityEvent {
   return {
     id: activity.id,

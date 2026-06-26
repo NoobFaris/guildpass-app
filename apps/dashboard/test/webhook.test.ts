@@ -53,14 +53,14 @@ describe("Webhook Ingestion", () => {
     const eventId = "duplicate_123";
     const event: ActivityEvent = {
       id: eventId,
-      type: "pass.created",
-      source: "webhook",
-      severity: "info",
+      type: "pass.created" as const,
+      source: "webhook" as const,
+      severity: "info" as const,
       description: "Test Pass",
       timestamp: new Date().toISOString(),
       actor: {
-        name: "Admin"
-      }
+        name: "Admin",
+      },
     };
 
     await activityStorage.addEvent(event);
