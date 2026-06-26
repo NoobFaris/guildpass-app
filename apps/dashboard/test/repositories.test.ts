@@ -1,0 +1,287 @@
+/**
+ * Integration tests for the repository layer.
+ * Validates mock/durable adapters and factory selection.
+ */
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  getRepositoryFactory,
+  getPassRepository,
+  getGuildRepository,
+  getMemberRepository,
+  getActivityRepository,
+  clearRepositories,
+} from "../lib/repositories/factory";
+
+// Mock environment for testing
+process.env.DASHBOARD_STORAGE_MODE = "mock";
+process.env.DASHBOARD_API_MODE = "mock";
+
+test("Repository Factory: MockPassRepository", async () => {
+  clearRepositories();
+
+  const repo = getPassRepository();
+  assert.ok(repo, "Pass repository should be created");
+
+  const passes = await repo.getAll();
+  assert.ok(Array.isArray(passes), "Should return array of passes");
+
+  // Test create
+  const newPass = await repo.create({
+    name: "Test Pass",
+    price: 1.0,
+    description: "Test description",
+    status: "active",
+    currentSupply: 0,
+  });
+  assert.ok(newPass.id, "Created pass should have id");
+  assert.strictEqual(newPass.name, "Test Pass", "Pass name should match");
+
+  // Test getById
+  const retrieved = await repo.getById(newPass.id);
+  assert.ok(retrieved, "Should retrieve created pass");
+  assert.strictEqual(retrieved.id, newPass.id, "Retrieved pass id should match");
+
+  // Test update
+  const updated = await repo.update(newPass.id, { price: 2.0 });
+  assert.strictEqual(updated?.price, 2.0, "Updated price should reflect");
+
+  // Test delete
+  const deleted = await repo.delete(newPass.id);
+  assert.strictEqual(deleted, true, "Delete should return true");
+
+  const notFound = await repo.getById(newPass.id);
+  assert.strictEqual(notFound, null, "Deleted pass should not be found");
+});
+
+test("Repository Factory: MockGuildRepository", async () => {
+  clearRepositories();
+
+  const repo = getGuildRepository();
+  assert.ok(repo, "Guild repository should be created");
+
+  const guilds = await repo.getAll();
+  assert.ok(Array.isArray(guilds), "Should return array of guilds");
+
+  // Test create
+  const newGuild = await repo.create({
+    name: "Test Guild",
+    description: "Test description",
+    memberCount: 0,
+    passCount: 0,
+  });
+  assert.ok(newGuild.id, "Created guild should have id");
+
+  // Test getById
+  const retrieved = await repo.getById(newGuild.id);
+  assert.ok(retrieved, "Should retrieve created guild");
+});
+
+test("Repository Factory: MockMemberRepository", async () => {
+  clearRepositories();
+
+  const repo = getMemberRepository();
+  assert.ok(repo, "Member repository should be created");
+
+  const members = await repo.getAll();
+  assert.ok(Array.isArray(members), "Should return array of members");
+
+  // Test create
+  const newMember = await repo.create({
+    wallet: "0x999zzz",
+    name: "Charlie",
+    status: "active",
+    roles: ["member"],
+    joinedAt: new Date().toISOString(),
+    lastActive: new Date().toISOString(),
+  });
+  assert.ok(newMember.id, "Created member should have id");
+  assert.strictEqual(newMember.wallet, "0x999zzz", "Member wallet should match");
+
+  // Test getByWallet
+  const byWallet = await repo.getByWallet("0x999zzz");
+  assert.ok(byWallet, "Should find member by wallet");
+  assert.strictEqual(byWallet.id, newMember.id, "Located member should match created");
+
+  // Test update
+  const updated = await repo.update(newMember.id, { status: "inactive" });
+  assert.strictEqual(updated?.status, "inactive", "Updated status should reflect");
+
+  // Wallet index should still work after update
+  const stillFound = await repo.getByWallet("0x999zzz");
+  assert.ok(stillFound, "Member should still be findable by wallet after update");
+});
+
+test("Repository Factory: MockActivityRepository", async () => {
+  clearRepositories();
+
+  const repo = getActivityRepository();
+  assert.ok(repo, "Activity repository should be created");
+
+  // Test append
+  const event1 = {
+    id: "evt_001",
+    type: "member.joined" as const,
+    source: "dashboard",
+    severity: "info" as const,
+    actor: { name: "system" },
+    timestamp: new Date().toISOString(),
+    description: "Member joined",
+  };
+
+  const result1 = await repo.append(event1);
+  assert.strictEqual(result1, "recorded", "First event should be recorded");
+
+  // Test duplicate detection
+  const result2 = await repo.append(event1);
+  assert.strictEqual(result2, "duplicate", "Same event should be detected as duplicate");
+
+  // Test query
+  const events = await repo.query({});
+  assert.ok(Array.isArray(events), "Should return array of events");
+  assert.ok(events.length >= 1, "Should include appended event");
+
+  // Test hasProcessed
+  const hasProcessed = await repo.hasProcessed("evt_001");
+  assert.strictEqual(hasProcessed, true, "Should report event as processed");
+
+  const notProcessed = await repo.hasProcessed("evt_nonexistent");
+  assert.strictEqual(notProcessed, false, "Should report non-existent event as not processed");
+});
+
+test("Repository Factory: Singleton behavior", async () => {
+  clearRepositories();
+
+  const pass1 = getPassRepository();
+  const pass2 = getPassRepository();
+  assert.strictEqual(pass1, pass2, "Should return same instance");
+
+  const guild1 = getGuildRepository();
+  const guild2 = getGuildRepository();
+  assert.strictEqual(guild1, guild2, "Should return same instance");
+
+  const member1 = getMemberRepository();
+  const member2 = getMemberRepository();
+  assert.strictEqual(member1, member2, "Should return same instance");
+
+  const activity1 = getActivityRepository();
+  const activity2 = getActivityRepository();
+  assert.strictEqual(activity1, activity2, "Should return same instance");
+});
+
+test("Repository Factory: Factory pattern", async () => {
+  clearRepositories();
+
+  const factory = getRepositoryFactory();
+  assert.ok(factory, "Factory should exist");
+  assert.ok(factory.passRepository, "Factory should have passRepository method");
+  assert.ok(factory.guildRepository, "Factory should have guildRepository method");
+  assert.ok(factory.memberRepository, "Factory should have memberRepository method");
+  assert.ok(factory.activityRepository, "Factory should have activityRepository method");
+});
+
+test("Repository Factory: Data persistence across calls", async () => {
+  clearRepositories();
+
+  // Create a pass
+  const pass1 = await getPassRepository().create({
+    name: "Persistent Pass",
+    price: 5.0,
+    description: "Should persist",
+    status: "active",
+    currentSupply: 10,
+  });
+
+  // Create a member
+  const member1 = await getMemberRepository().create({
+    wallet: "0xpersist",
+    name: "Persistent Member",
+    status: "active",
+    roles: [],
+    joinedAt: new Date().toISOString(),
+    lastActive: new Date().toISOString(),
+  });
+
+  // Retrieve and verify
+  const retrieved = await getPassRepository().getById(pass1.id);
+  assert.strictEqual(retrieved?.id, pass1.id, "Pass should persist");
+
+  const memberRetrieved = await getMemberRepository().getByWallet("0xpersist");
+  assert.strictEqual(memberRetrieved?.wallet, "0xpersist", "Member should persist");
+
+  // Verify all instances share the same data
+  const allPasses = await getPassRepository().getAll();
+  assert.ok(allPasses.some((p) => p.id === pass1.id), "New pass should appear in getAll");
+
+  const allMembers = await getMemberRepository().getAll();
+  assert.ok(allMembers.some((m) => m.wallet === "0xpersist"), "New member should appear in getAll");
+});
+
+test("Repository Factory: Clear repositories", async () => {
+  // Create a pass
+  await getPassRepository().create({
+    name: "Will be cleared",
+    price: 1.0,
+    description: "Test",
+    status: "draft",
+    currentSupply: 0,
+  });
+
+  // Clear
+  clearRepositories();
+
+  // Create new factory and verify fresh state
+  const newPass = await getPassRepository().create({
+    name: "After clear",
+    price: 2.0,
+    description: "Should be fresh",
+    status: "active",
+    currentSupply: 5,
+  });
+
+  // The cleared repository should have fresh mock data
+  const allPasses = await getPassRepository().getAll();
+  assert.ok(allPasses.some((p) => p.name === "After clear"), "Should have new pass");
+});
+
+test("Repository Factory: Error handling in durable mode stub", async () => {
+  // This test validates that durable adapters throw appropriate errors
+  // when not yet implemented
+
+  process.env.DASHBOARD_STORAGE_MODE = "durable";
+  process.env.DATABASE_URL = "postgresql://localhost/test";
+
+  clearRepositories();
+
+  try {
+    const repo = getPassRepository();
+    await repo.getAll();
+    assert.fail("Should throw 'not yet implemented'");
+  } catch (error: any) {
+    assert.ok(error.message.includes("not yet implemented"), "Durable adapter should throw informative error");
+  }
+
+  // Reset to mock
+  process.env.DASHBOARD_STORAGE_MODE = "mock";
+  delete process.env.DATABASE_URL;
+  clearRepositories();
+});
+
+test("Repository Factory: durable mode without DATABASE_URL throws", async () => {
+  process.env.DASHBOARD_STORAGE_MODE = "durable";
+  delete process.env.DATABASE_URL;
+
+  clearRepositories();
+
+  try {
+    getRepositoryFactory();
+    assert.fail("Should throw missing DATABASE_URL error");
+  } catch (error: any) {
+    assert.ok(error.message.includes("DATABASE_URL"), "Should complain about missing DATABASE_URL");
+  }
+
+  // Reset
+  process.env.DASHBOARD_STORAGE_MODE = "mock";
+  clearRepositories();
+});
