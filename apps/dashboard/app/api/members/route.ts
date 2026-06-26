@@ -5,21 +5,24 @@ import { MOCK_API_SESSION } from "@/lib/auth/session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
 import { IntegrationClient } from "@guildpass/integration-client";
 import { getEnv, getApiMode } from "@/lib/env";
+import { getMemberRepository } from "@/lib/repositories/factory";
 
 /**
  * GET /api/members
  * Accessible to all authenticated roles (members:read).
+ * In live mode: supports wallet and discordUserId lookups.
+ * In mock mode: returns all members from configured repository.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   return handleApiError(async () => {
-    const mode = getApiMode();
+    const apiMode = getApiMode();
 
     // Allow live lookups by query: ?wallet=0x.. or ?discordUserId=123
     const url = new URL(request.url);
     const wallet = url.searchParams.get("wallet");
     const discordUserId = url.searchParams.get("discordUserId");
 
-    if (mode === "live") {
+    if (apiMode === "live") {
       const env = getEnv();
       // Allow injecting a test client via globalThis to avoid making real HTTP calls in tests
       const testClient = (globalThis as any).__TEST_INTEGRATION_CLIENT;
@@ -69,11 +72,13 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
-    // Default: mock mode — return local mock members
+    // Mock mode — return all members from configured repository
     try {
-      return NextResponse.json(mockMembers as Member[]);
+      const memberRepository = getMemberRepository();
+      return NextResponse.json(await memberRepository.getAll());
     } catch (error) {
       console.error("Error fetching members:", error);
+      // Fallback to mock data on error
       return NextResponse.json(mockMembers as Member[]);
     }
   });
