@@ -119,30 +119,31 @@ test("Repository Factory: MockActivityRepository", async () => {
   const repo = getActivityRepository();
   assert.ok(repo, "Activity repository should be created");
 
-  // Test append
   const event1 = {
-    id: "evt_001",
     type: "member.joined" as const,
-    source: "dashboard",
+    source: "dashboard" as const,
     severity: "info" as const,
     actor: { name: "system" },
-    timestamp: new Date().toISOString(),
     description: "Member joined",
   };
 
   const result1 = await repo.append(event1);
-  assert.strictEqual(result1, "recorded", "First event should be recorded");
-
-  // Test duplicate detection
-  const result2 = await repo.append(event1);
-  assert.strictEqual(result2, "duplicate", "Same event should be detected as duplicate");
+  assert.strictEqual(result1.type, "member.joined", "Appended event should preserve type");
+  assert.ok(result1.id, "Appended event should get an id");
+  assert.ok(result1.timestamp, "Appended event should get a timestamp");
 
   // Test query
   const events = await repo.query({});
   assert.ok(Array.isArray(events), "Should return array of events");
-  assert.ok(events.length >= 1, "Should include appended event");
+  assert.ok(events.some((event) => event.id === result1.id), "Should include appended event");
 
-  // Test hasProcessed
+  // Test explicit processed-event tracking
+  const marked = await repo.markProcessed("evt_001");
+  assert.strictEqual(marked, true, "First processed marker should be recorded");
+
+  const duplicateMarked = await repo.markProcessed("evt_001");
+  assert.strictEqual(duplicateMarked, false, "Same processed marker should be detected as duplicate");
+
   const hasProcessed = await repo.hasProcessed("evt_001");
   assert.strictEqual(hasProcessed, true, "Should report event as processed");
 
@@ -194,7 +195,7 @@ test("Repository Factory: Data persistence across calls", async () => {
   });
 
   // Create a member
-  const member1 = await getMemberRepository().create({
+  await getMemberRepository().create({
     wallet: "0xpersist",
     name: "Persistent Member",
     status: "active",
@@ -232,7 +233,7 @@ test("Repository Factory: Clear repositories", async () => {
   clearRepositories();
 
   // Create new factory and verify fresh state
-  const newPass = await getPassRepository().create({
+  await getPassRepository().create({
     name: "After clear",
     price: 2.0,
     description: "Should be fresh",

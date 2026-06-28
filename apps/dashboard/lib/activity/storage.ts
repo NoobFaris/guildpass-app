@@ -2,6 +2,7 @@ import { mkdir, open, readFile, appendFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ActivityEvent } from "./types";
+import { ActivityQuery, ActivityQueryResult, filterActivityEvents } from "./query";
 import { type Activity, mockActivity } from "../mock-data";
 
 /**
@@ -18,6 +19,7 @@ export type ActivityWriteResult = "recorded" | "duplicate";
 export interface IActivityStorage {
   addEvent(event: ActivityEvent): Promise<void>;
   getEvents(limit?: number): Promise<ActivityEvent[]>;
+  queryEvents(query?: ActivityQuery): Promise<ActivityQueryResult>;
   isDuplicate(eventId: string): Promise<boolean>;
   hasProcessedEvent(eventId: string): Promise<boolean>;
   recordProcessedEvent(eventId: string): Promise<ActivityWriteResult>;
@@ -89,7 +91,15 @@ class InMemoryActivityStorage implements IActivityStorage {
   }
 
   async getEvents(limit?: number): Promise<ActivityEvent[]> {
-    return limit ? this.events.slice(0, limit) : [...this.events];
+    if (limit) {
+      return this.queryEvents({ limit }).then((result) => result.events);
+    }
+
+    return [...this.events];
+  }
+
+  async queryEvents(query: ActivityQuery = {}): Promise<ActivityQueryResult> {
+    return filterActivityEvents(this.events, query);
   }
 
   async isDuplicate(eventId: string): Promise<boolean> {
@@ -151,6 +161,28 @@ export class FileActivityStorage implements IActivityStorage {
   }
 
   async getEvents(limit?: number): Promise<ActivityEvent[]> {
+    if (limit) {
+      return this.queryEvents({ limit }).then((result) => result.events);
+    }
+
+    await this.ensureStore();
+
+    try {
+      const file = await readFile(this.eventsPath, "utf8");
+      return file
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as ActivityEvent)
+        .reverse();
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  async queryEvents(query: ActivityQuery = {}): Promise<ActivityQueryResult> {
     await this.ensureStore();
 
     try {
@@ -161,10 +193,10 @@ export class FileActivityStorage implements IActivityStorage {
         .map((line) => JSON.parse(line) as ActivityEvent)
         .reverse();
 
-      return limit ? events.slice(0, limit) : events;
+      return filterActivityEvents(events, query);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return [];
+        return filterActivityEvents([], query);
       }
       throw error;
     }

@@ -1,4 +1,4 @@
-import { test, describe, before, after } from "node:test";
+import { test, describe, after } from "node:test";
 import assert from "node:assert";
 import { DiscordMockAdapter } from "../lib/integrations";
 

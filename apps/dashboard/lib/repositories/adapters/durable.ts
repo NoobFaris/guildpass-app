@@ -52,22 +52,22 @@ export class DurablePassRepository extends DurableRepository implements IPassRep
     throw new Error("DurablePassRepository not yet implemented. Configure STORAGE_BACKEND in .env");
   }
 
-  async getById(id: string): Promise<Pass | null> {
+  async getById(_id: string): Promise<Pass | null> {
     // TODO: Implement
     throw new Error("DurablePassRepository not yet implemented");
   }
 
-  async create(pass: Omit<Pass, "id" | "createdAt">): Promise<Pass> {
+  async create(_pass: Omit<Pass, "id" | "createdAt">): Promise<Pass> {
     // TODO: Implement with transaction support
     throw new Error("DurablePassRepository not yet implemented");
   }
 
-  async update(id: string, pass: Partial<Pass>): Promise<Pass | null> {
+  async update(_id: string, _pass: Partial<Pass>): Promise<Pass | null> {
     // TODO: Implement with optimistic locking or version column
     throw new Error("DurablePassRepository not yet implemented");
   }
 
-  async delete(id: string): Promise<boolean> {
+  async delete(_id: string): Promise<boolean> {
     // TODO: Implement soft-delete pattern for audit trail
     throw new Error("DurablePassRepository not yet implemented");
   }
@@ -84,19 +84,19 @@ export class DurableGuildRepository extends DurableRepository implements IGuildR
     throw new Error("DurableGuildRepository not yet implemented");
   }
 
-  async getById(id: string): Promise<Guild | null> {
+  async getById(_id: string): Promise<Guild | null> {
     throw new Error("DurableGuildRepository not yet implemented");
   }
 
-  async create(guild: Omit<Guild, "id" | "createdAt">): Promise<Guild> {
+  async create(_guild: Omit<Guild, "id" | "createdAt">): Promise<Guild> {
     throw new Error("DurableGuildRepository not yet implemented");
   }
 
-  async update(id: string, guild: Partial<Guild>): Promise<Guild | null> {
+  async update(_id: string, _guild: Partial<Guild>): Promise<Guild | null> {
     throw new Error("DurableGuildRepository not yet implemented");
   }
 
-  async delete(id: string): Promise<boolean> {
+  async delete(_id: string): Promise<boolean> {
     throw new Error("DurableGuildRepository not yet implemented");
   }
 }
@@ -114,24 +114,24 @@ export class DurableMemberRepository extends DurableRepository implements IMembe
     throw new Error("DurableMemberRepository not yet implemented");
   }
 
-  async getById(id: string): Promise<Member | null> {
+  async getById(_id: string): Promise<Member | null> {
     throw new Error("DurableMemberRepository not yet implemented");
   }
 
-  async getByWallet(wallet: string): Promise<Member | null> {
+  async getByWallet(_wallet: string): Promise<Member | null> {
     // High-traffic operation; should be indexed
     throw new Error("DurableMemberRepository not yet implemented");
   }
 
-  async create(member: Omit<Member, "id">): Promise<Member> {
+  async create(_member: Omit<Member, "id">): Promise<Member> {
     throw new Error("DurableMemberRepository not yet implemented");
   }
 
-  async update(id: string, member: Partial<Member>): Promise<Member | null> {
+  async update(_id: string, _member: Partial<Member>): Promise<Member | null> {
     throw new Error("DurableMemberRepository not yet implemented");
   }
 
-  async delete(id: string): Promise<boolean> {
+  async delete(_id: string): Promise<boolean> {
     throw new Error("DurableMemberRepository not yet implemented");
   }
 }
@@ -146,11 +146,11 @@ export class DurableMemberRepository extends DurableRepository implements IMembe
  * - Keep raw JSON metadata for future schema evolution
  */
 export class DurableActivityRepository extends DurableRepository implements IActivityRepository {
-  async append(event: Omit<ActivityEvent, "id" | "timestamp">): Promise<ActivityEvent> {
+  async append(_event: Omit<ActivityEvent, "id" | "timestamp">): Promise<ActivityEvent> {
     throw new Error("DurableActivityRepository not yet implemented");
   }
 
-  async query(options?: {
+  async query(_options?: {
     limit?: number;
     type?: ActivityEvent["type"];
     since?: string;
@@ -158,11 +158,11 @@ export class DurableActivityRepository extends DurableRepository implements IAct
     throw new Error("DurableActivityRepository not yet implemented");
   }
 
-  async hasProcessed(eventId: string): Promise<boolean> {
+  async hasProcessed(_eventId: string): Promise<boolean> {
     throw new Error("DurableActivityRepository not yet implemented");
   }
 
-  async markProcessed(eventId: string): Promise<boolean> {
+  async markProcessed(_eventId: string): Promise<boolean> {
     throw new Error("DurableActivityRepository not yet implemented");
   }
 }

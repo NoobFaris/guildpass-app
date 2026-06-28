@@ -23,14 +23,14 @@ export async function GET(request: Request): Promise<NextResponse> {
     const discordUserId = url.searchParams.get("discordUserId");
 
     if (apiMode === "live") {
-      const env = getEnv();
       // Allow injecting a test client via globalThis to avoid making real HTTP calls in tests
       const testClient = (globalThis as any).__TEST_INTEGRATION_CLIENT;
+      const env = testClient ? null : getEnv();
       const client =
         testClient ??
         new IntegrationClient({
-          baseUrl: env.GUILD_PASS_CORE_URL as string,
-          apiKey: env.GUILD_PASS_CORE_API_KEY,
+          baseUrl: env!.GUILD_PASS_CORE_URL as string,
+          apiKey: env!.GUILD_PASS_CORE_API_KEY,
         });
 
       try {

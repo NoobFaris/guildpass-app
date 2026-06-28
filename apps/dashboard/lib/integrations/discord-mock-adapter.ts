@@ -14,7 +14,7 @@ export class DiscordMockAdapter implements IntegrationAdapter {
 
   async getDetails(): Promise<IntegrationDetails> {
     // 1. Determine status based on explicit constructor override, env override, or default detection
-    let status: IntegrationStatus = "disabled";
+    let status: IntegrationStatus;
     
     const envOverride = process.env.DISCORD_BOT_MOCK_STATUS as IntegrationStatus | undefined;
     

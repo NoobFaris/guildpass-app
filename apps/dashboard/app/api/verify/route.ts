@@ -17,14 +17,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (mode === "live") {
-      const env = getEnv();
       // Allow injecting a test client via globalThis for unit tests
       const testClient = (globalThis as any).__TEST_INTEGRATION_CLIENT;
+      const env = testClient ? null : getEnv();
       const client =
         testClient ??
         new IntegrationClient({
-          baseUrl: env.GUILD_PASS_CORE_URL as string,
-          apiKey: env.GUILD_PASS_CORE_API_KEY,
+          baseUrl: env!.GUILD_PASS_CORE_URL as string,
+          apiKey: env!.GUILD_PASS_CORE_API_KEY,
         });
 
       const result: VerificationResult = await client.verifyWallet(

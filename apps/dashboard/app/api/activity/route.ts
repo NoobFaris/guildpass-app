@@ -1,33 +1,39 @@
 import { NextResponse } from "next/server";
-import { handleApiError } from "@/lib/api-helpers";
-import { mockActivity } from "@/lib/mock-data";
+import { apiError } from "@/lib/api-helpers";
+import { filterActivityEvents, parseActivityQuery } from "@/lib/activity/query";
 import { activityStorage } from "@/lib/activity/storage";
 import { getActivityRepository } from "@/lib/repositories/factory";
 
-export async function GET(): Promise<NextResponse> {
-  return handleApiError(async () => {
-    try {
-      // Get activities from repository
-      const activities = await getActivityRepository().query({});
+export async function GET(request: Request): Promise<NextResponse> {
+  const url = new URL(request.url);
+  const parsed = parseActivityQuery(url.searchParams);
 
-      // Merge with activity storage events for compatibility
-      const realActivities = await activityStorage.getEvents();
-      
-      // Combine both sources, sorted by newest first
-      const merged = [...activities, ...realActivities, ...mockActivity].sort(
-        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
+  if (!parsed.ok) {
+    return NextResponse.json(
+      { error: "Invalid activity query", errors: parsed.errors },
+      { status: 400 }
+    );
+  }
 
-      // Remove duplicates by id
-      const seen = new Set<string>();
-      return merged.filter((item) => {
-        if (seen.has(item.id)) return false;
-        seen.add(item.id);
-        return true;
+  try {
+    const repositoryEvents = await getActivityRepository()
+      .query({})
+      .catch((error) => {
+        console.error("Error fetching repository activity:", error);
+        return [];
       });
-    } catch (error) {
-      console.error("Error fetching activity:", error);
-      return mockActivity;
-    }
-  });
+    const storageEvents = await activityStorage.getEvents();
+    const seen = new Set<string>();
+    const merged = [...repositoryEvents, ...storageEvents].filter((event) => {
+      if (seen.has(event.id)) return false;
+      seen.add(event.id);
+      return true;
+    });
+
+    const result = filterActivityEvents(merged, parsed.value);
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("Error fetching activity:", error);
+    return apiError("Failed to fetch activity", 500);
+  }
 }

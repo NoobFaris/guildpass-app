@@ -5,7 +5,7 @@ import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
 import LastUpdated from "@/components/LastUpdated";
 import { useActivityFeed } from "@/lib/hooks/useActivityFeed";
-import { mockPasses, mockGuilds, mockMembers, type Member as MockMember, type Pass as MockPass, type Guild as MockGuild } from "@/lib/mock-data";
+import { mockPasses, mockGuilds, mockMembers, type Member as MockMember } from "@/lib/mock-data";
 import { useEffect, useState } from "react";
 
 export default function DashboardPage() {

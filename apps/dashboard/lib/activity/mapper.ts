@@ -5,6 +5,10 @@ function displayValue(...values: Array<unknown>): string {
   return typeof value === "string" ? value : "Unknown";
 }
 
+function entityId(...values: Array<unknown>): string {
+  return displayValue(...values);
+}
+
 export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
   const { type, data, id, created } = payload;
   const timestamp = new Date(created * 1000).toISOString();
@@ -26,7 +30,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "member",
-          id: data.id,
+          id: entityId(data.id, data.wallet, data.name),
           name: data.name,
         },
         metadata: data,
@@ -49,7 +53,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "member",
-          id: data.id,
+          id: entityId(data.id, data.wallet, data.name),
           name: data.name,
         },
         metadata: data,
@@ -71,7 +75,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "pass",
-          id: data.id,
+          id: entityId(data.id, data.name),
           name: data.name,
         },
         metadata: data,
@@ -93,7 +97,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "pass",
-          id: data.id,
+          id: entityId(data.id, data.name),
           name: data.name,
         },
         metadata: data,
@@ -115,7 +119,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "guild",
-          id: data.id,
+          id: entityId(data.id, data.name),
           name: data.name,
         },
         metadata: data,
@@ -135,7 +139,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "verification",
-          id: data.wallet,
+          id: entityId(data.wallet),
         },
         metadata: data,
       };

@@ -1,0 +1,40 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model ProcessedEvent {
+  id              String   @id @default(uuid())
+  blockHash       String
+  blockNumber     BigInt
+  transactionHash String
+  logIndex        Int
+  status          String   @default("processed") // e.g., processed, reverted
+  eventType       String
+  data            Json
+  createdAt       DateTime @default(now())
+
+  @@unique([transactionHash, logIndex])
+  @@index([blockNumber])
+  @@index([blockHash])
+}
+
+model Membership {
+  id        String   @id @default(uuid())
+  wallet    String
+  passId    BigInt
+  status    Int
+  updatedAt DateTime @updatedAt
+
+  @@unique([wallet, passId])
+}
+
+model IndexerCheckpoint {
+  id            String   @id @default("singleton")
+  lastBlock     BigInt
+  updatedAt     DateTime @updatedAt
+}
