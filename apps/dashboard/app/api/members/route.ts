@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleApiError, apiError } from "@/lib/api-helpers";
+import { NotFoundError } from "@/lib/api-errors";
 import { mockMembers, type Member } from "@/lib/mock-data";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
@@ -144,7 +145,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const body = await request.json();
     const memberRepository = getMemberRepository();
     const updated = await memberRepository.update(id, body);
-    if (!updated) throw new Error("Member not found or update failed");
+    if (!updated) throw new NotFoundError("Member not found.");
     return updated;
   });
 }
@@ -171,7 +172,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   return handleApiError(async () => {
     const memberRepository = getMemberRepository();
     const success = await memberRepository.delete(id);
-    if (!success) throw new Error("Member not found or deletion failed");
+    if (!success) throw new NotFoundError("Member not found.");
     return { success: true };
   });
 }
