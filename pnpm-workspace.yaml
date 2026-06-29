@@ -2,8 +2,11 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
+  '@prisma/client': set this to true or false
+  '@prisma/engines': set this to true or false
   core-js: true
   core-js-pure: true
   esbuild: true
+  prisma: set this to true or false
 minimumReleaseAgeExclude:
   - eslint@10.5.0

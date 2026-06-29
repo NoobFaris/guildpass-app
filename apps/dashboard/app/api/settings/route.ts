@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleApiError, apiError } from "@/lib/api-helpers";
-import { MOCK_API_SESSION } from "@/lib/auth/session";
+import { requireDashboardSession, UnauthorizedError } from "@/lib/auth/server-session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
 
 /**
@@ -9,16 +9,17 @@ import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
  *
  * PATCH /api/settings
  * Requires settings:write permission.
- *
- * ⚠️  In production, resolve the session from the request (JWT / cookie)
- *     instead of using MOCK_API_SESSION, then assertPermission against it.
  */
-export async function PATCH(): Promise<NextResponse> {
+export async function PATCH(request: Request): Promise<NextResponse> {
   try {
-    assertPermission(MOCK_API_SESSION, "settings:write");
+    const session = requireDashboardSession(request);
+    assertPermission(session, "settings:write");
   } catch (err) {
     if (err instanceof PermissionDeniedError) {
       return apiError(err.message, 403);
+    }
+    if (err instanceof UnauthorizedError) {
+      return apiError(err.message, 401);
     }
     throw err;
   }
