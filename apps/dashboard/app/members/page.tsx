@@ -21,6 +21,7 @@ import { useSession } from "@/lib/hooks/useSession";
 import { canManageMembers } from "@/lib/permissions";
 import { useEffect, useState, useRef } from "react";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
+import { readApiResult } from "@/lib/api-client";
 
 export default function MembersPage() {
   const session = useSession();
@@ -42,9 +43,8 @@ export default function MembersPage() {
     async function load() {
       try {
         const res = await fetch("/api/members");
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        if (mounted && Array.isArray(data)) {
+        const data = await readApiResult<MockMember[]>(res);
+        if (mounted) {
           setMembers(data);
           previousMembersRef.current = data;
         }
@@ -66,11 +66,7 @@ export default function MembersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to update member");
-      }
-      return res.json();
+      return readApiResult<MockMember>(res);
     },
     onOptimisticUpdate: ({ id, data }) => {
       previousMembersRef.current = members;
@@ -107,11 +103,7 @@ export default function MembersPage() {
       const res = await fetch(`/api/members?id=${id}`, {
         method: "DELETE",
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to remove member");
-      }
-      return res.json();
+      return readApiResult<{ success: boolean }>(res);
     },
     onOptimisticUpdate: (id) => {
       previousMembersRef.current = members;
@@ -227,12 +219,7 @@ export default function MembersPage() {
         }),
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to invite member");
-      }
-
-      const newMember = await res.json();
+      const newMember = await readApiResult<MockMember>(res);
 
 // Fallback safety (prevents roles/status undefined bugs)
 const safeMember = {

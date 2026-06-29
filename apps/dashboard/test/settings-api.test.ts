@@ -18,17 +18,19 @@ describe("GET /api/settings", () => {
     const body = await res.json();
 
     assert.equal(res.status, 200);
-    assert.equal(typeof body.workspaceName, "string");
-    assert.equal(typeof body.timezone, "string");
-    assert.equal(typeof body.displayName, "string");
-    assert.equal(typeof body.email, "string");
+    assert.equal(body.ok, true);
+    assert.equal(typeof body.data.workspaceName, "string");
+    assert.equal(typeof body.data.timezone, "string");
+    assert.equal(typeof body.data.displayName, "string");
+    assert.equal(typeof body.data.email, "string");
   });
 
   test("reflects a persisted update from the mock repository", async () => {
     await getSettingsRepository().update({ workspaceName: "Persisted DAO" });
     const res = await GET();
     const body = await res.json();
-    assert.equal(body.workspaceName, "Persisted DAO");
+    assert.equal(body.ok, true);
+    assert.equal(body.data.workspaceName, "Persisted DAO");
   });
 });
 
@@ -49,6 +51,8 @@ describe("PATCH /api/settings", () => {
     const body = await res.json();
 
     assert.equal(res.status, 403);
+    assert.equal(body.ok, false);
+    assert.equal(body.code, "FORBIDDEN");
     assert.ok(typeof body.error === "string" && body.error.length > 0);
 
     // The rejected write must not have mutated the stored settings.

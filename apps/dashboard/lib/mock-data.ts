@@ -1,5 +1,6 @@
 import type { ActivityEvent } from "@guildpass/integration-client";
 import type { ActivityQuery } from "./activity/query";
+import { readApiResult } from "./api-client";
 
 export interface Pass {
   id: string;
@@ -112,18 +113,7 @@ export async function fetchActivity(query: ActivityQuery = {}): Promise<Activity
     }
 
     const response = await fetch(`/api/activity${params.size ? `?${params}` : ""}`);
-    if (!response.ok) throw new Error("Failed to fetch activity");
-    const payload = await response.json();
-
-    if (Array.isArray(payload)) {
-      return { events: payload, nextCursor: null, total: payload.length };
-    }
-
-    return {
-      events: Array.isArray(payload.events) ? payload.events : [],
-      nextCursor: payload.nextCursor ?? null,
-      total: typeof payload.total === "number" ? payload.total : payload.events?.length ?? 0,
-    };
+    return await readApiResult<ActivityFetchResult>(response);
   } catch (error) {
     console.warn("Using fallback mock data due to fetch error:", error);
     return Promise.resolve({

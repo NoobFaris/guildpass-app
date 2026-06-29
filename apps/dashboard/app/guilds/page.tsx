@@ -6,6 +6,7 @@ import { useEffect, useState, useRef } from "react";
 import { useSession } from "@/lib/hooks/useSession";
 import { canManageGuilds } from "@/lib/permissions";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
+import { readApiResult } from "@/lib/api-client";
 
 export default function GuildsPage() {
   const session = useSession();
@@ -19,9 +20,8 @@ export default function GuildsPage() {
     async function load() {
       try {
         const res = await fetch("/api/guilds");
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        if (mounted && Array.isArray(data)) {
+        const data = await readApiResult<MockGuild[]>(res);
+        if (mounted) {
           setGuilds(data);
           previousGuildsRef.current = data;
         }
@@ -42,11 +42,7 @@ export default function GuildsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to update guild");
-      }
-      return res.json();
+      return readApiResult<MockGuild>(res);
     },
     onOptimisticUpdate: ({ id, data }) => {
       previousGuildsRef.current = guilds;
@@ -83,11 +79,7 @@ export default function GuildsPage() {
       const res = await fetch(`/api/guilds?id=${id}`, {
         method: "DELETE",
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to delete guild");
-      }
-      return res.json();
+      return readApiResult<{ success: boolean }>(res);
     },
     onOptimisticUpdate: (id) => {
       previousGuildsRef.current = guilds;

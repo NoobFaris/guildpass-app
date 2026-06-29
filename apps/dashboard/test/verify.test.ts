@@ -16,9 +16,11 @@ test("POST /api/verify returns mock verification in mock mode", async () => {
     });
 
     const res = await POST(req as any);
-    const data = await res.json();
+    const body = await res.json();
 
     // In mock mode we return a mock verification object
+    assert.strictEqual(body.ok, true);
+    const data = body.data;
     assert.strictEqual(data.wallet, payload.wallet);
     assert.strictEqual(data.userId, payload.discordUserId);
     assert.strictEqual(data.verified, true);

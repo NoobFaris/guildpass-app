@@ -18,6 +18,8 @@ describe("handleApiError — internal error leakage", () => {
     const body = await response.json();
 
     assert.equal(response.status, 500);
+    assert.equal(body.ok, false);
+    assert.equal(body.code, "SERVER_ERROR");
     assert.equal(body.error, "An unexpected error occurred");
     // The raw internal detail must never reach the client.
     assert.ok(!JSON.stringify(body).includes("ECONNREFUSED"));
@@ -34,6 +36,8 @@ describe("handleApiError — internal error leakage", () => {
     const body = await response.json();
 
     assert.equal(response.status, 500);
+    assert.equal(body.ok, false);
+    assert.equal(body.code, "SERVER_ERROR");
     assert.equal(body.error, "An unexpected error occurred");
     assert.ok(!JSON.stringify(body).includes("/etc/secrets"));
   });
@@ -47,8 +51,10 @@ describe("handleApiError — internal error leakage", () => {
     const body = await response.json();
 
     assert.equal(response.status, 400);
+    assert.equal(body.ok, false);
+    assert.equal(body.code, "VALIDATION_ERROR");
     assert.equal(body.error, "Invalid settings payload");
-    assert.deepEqual(body.errors, [
+    assert.deepEqual(body.fields, [
       { field: "timezone", message: "Unknown timezone" },
     ]);
   });
@@ -60,6 +66,8 @@ describe("handleApiError — internal error leakage", () => {
     const body = await response.json();
 
     assert.equal(response.status, 404);
+    assert.equal(body.ok, false);
+    assert.equal(body.code, "NOT_FOUND");
     assert.equal(body.error, "Member not found.");
   });
 
@@ -70,6 +78,8 @@ describe("handleApiError — internal error leakage", () => {
     const body = await response.json();
 
     assert.equal(response.status, 403);
+    assert.equal(body.ok, false);
+    assert.equal(body.code, "FORBIDDEN");
     assert.equal(body.error, "You do not have permission to perform this action.");
   });
 
@@ -80,6 +90,8 @@ describe("handleApiError — internal error leakage", () => {
     const body = await response.json();
 
     assert.equal(response.status, 403);
+    assert.equal(body.ok, false);
+    assert.equal(body.code, "FORBIDDEN");
     assert.ok(body.error.includes("members:write"));
   });
 

@@ -25,8 +25,10 @@ test("POST /api/verify uses injected IntegrationClient in live mode via mock cli
     });
 
     const res = await POST(req as any);
-    const data = await res.json();
+    const body = await res.json();
 
+    assert.strictEqual(body.ok, true);
+    const data = body.data;
     assert.strictEqual(data.userId, payload.discordUserId);
     assert.strictEqual(data.wallet, payload.wallet);
     assert.strictEqual(data.verified, true);

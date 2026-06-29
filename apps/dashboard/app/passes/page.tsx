@@ -22,6 +22,7 @@ import { useSession } from "@/lib/hooks/useSession";
 import { canManagePasses } from "@/lib/permissions";
 import { useEffect, useState, useRef } from "react";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
+import { readApiResult } from "@/lib/api-client";
 
 export default function PassesPage() {
   const session = useSession();
@@ -44,9 +45,8 @@ export default function PassesPage() {
     async function load() {
       try {
         const res = await fetch("/api/passes");
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        if (mounted && Array.isArray(data)) {
+        const data = await readApiResult<MockPass[]>(res);
+        if (mounted) {
           setPasses(data);
           previousPassesRef.current = data;
         }
@@ -67,11 +67,7 @@ export default function PassesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to update pass");
-      }
-      return res.json();
+      return readApiResult<MockPass>(res);
     },
     onOptimisticUpdate: ({ id, data }) => {
       previousPassesRef.current = passes;
@@ -206,12 +202,7 @@ export default function PassesPage() {
       }),
     });
 
-        if (!res.ok) {
-         const err = await res.json();
-         throw new Error(err.error || "Failed to create pass");
-      }
-
-       const newPass = await res.json();
+       const newPass = await readApiResult<MockPass>(res);
 
         setPasses((prev) => [newPass, ...prev]);
         setIsCreateOpen(false);

@@ -56,8 +56,10 @@ test("GET /api/members performs live wallet lookup via core API", async () => {
 
     const req = new Request("http://localhost/api/members?wallet=0xabc123");
     const res: Response = await GET(req as any);
-    const data = await res.json();
+    const body = await res.json();
 
+    assert.strictEqual(body.ok, true);
+    const data = body.data;
     assert.ok(Array.isArray(data));
     assert.strictEqual(data.length, 1);
     assert.strictEqual(data[0].wallet, "0xabc123");

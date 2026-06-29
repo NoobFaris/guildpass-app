@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { handleApiError, apiError } from "@/lib/api-helpers";
+import {
+  apiError,
+  apiUnsupported,
+  apiValidationError,
+  handleApiError,
+} from "@/lib/api-helpers";
+import type { ApiFieldError } from "@/lib/api-contracts";
 import { mockGuilds, type Guild } from "@/lib/mock-data";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
@@ -17,7 +23,11 @@ export async function GET(): Promise<NextResponse> {
 
     if (apiMode === "live") {
       // IntegrationClient doesn't provide guild listing; require implementation in future
-      return apiError("Guild listing in live mode is not implemented", 501);
+      return apiUnsupported(
+        "guilds.list",
+        apiMode,
+        "Guild listing in live mode is not implemented"
+      );
     }
 
     try {
@@ -50,8 +60,18 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   return handleApiError(async () => {
     const body = await request.json();
+    const errors = validateGuildCreate(body);
+    if (errors.length > 0) {
+      return apiValidationError("Invalid guild payload", errors);
+    }
+
     const guildRepository = getGuildRepository();
-    return await guildRepository.create(body);
+    return await guildRepository.create({
+      name: body.name.trim(),
+      description: body.description.trim(),
+      memberCount: body.memberCount ?? 0,
+      passCount: body.passCount ?? 0,
+    });
   });
 }
 
@@ -72,7 +92,11 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
-  if (!id) return apiError("Missing guild ID", 400);
+  if (!id) {
+    return apiValidationError("Missing guild ID", [
+      { field: "id", message: "id query parameter is required" },
+    ]);
+  }
 
   return handleApiError(async () => {
     const body = await request.json();
@@ -100,7 +124,11 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
-  if (!id) return apiError("Missing guild ID", 400);
+  if (!id) {
+    return apiValidationError("Missing guild ID", [
+      { field: "id", message: "id query parameter is required" },
+    ]);
+  }
 
   return handleApiError(async () => {
     const guildRepository = getGuildRepository();
@@ -108,4 +136,29 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     if (!success) throw new Error("Guild not found or deletion failed");
     return { success: true };
   });
+}
+
+function validateGuildCreate(body: any): ApiFieldError[] {
+  const errors: ApiFieldError[] = [];
+
+  if (typeof body?.name !== "string" || body.name.trim().length === 0) {
+    errors.push({ field: "name", message: "name is required" });
+  }
+
+  if (
+    typeof body?.description !== "string" ||
+    body.description.trim().length === 0
+  ) {
+    errors.push({ field: "description", message: "description is required" });
+  }
+
+  if (body?.memberCount !== undefined && !Number.isInteger(body.memberCount)) {
+    errors.push({ field: "memberCount", message: "memberCount must be an integer" });
+  }
+
+  if (body?.passCount !== undefined && !Number.isInteger(body.passCount)) {
+    errors.push({ field: "passCount", message: "passCount must be an integer" });
+  }
+
+  return errors;
 }

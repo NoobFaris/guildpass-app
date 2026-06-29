@@ -20,7 +20,6 @@ import type {
   IMemberRepository,
   IActivityRepository,
 } from "../../lib/repositories/types";
-import type { ActivityEvent } from "@guildpass/integration-client";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Pass repository contract
@@ -613,7 +612,7 @@ export function activityRepositoryContract(
     const repo = createRepo();
 
     // First event
-    const early = await repo.append({
+    await repo.append({
       type: "member.joined",
       source: "dashboard",
       severity: "info",

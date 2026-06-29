@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
+import type {
+  ApiErrorCode,
+  ApiErrorResponse,
+  ApiFieldError,
+  ApiResult,
+  ApiSuccess,
+  ApiUnsupportedResponse,
+  ApiValidationErrorResponse,
+} from "./api-contracts";
 import { isPublicApiError, ValidationError } from "@/lib/api-errors";
 
-export function apiResponse<T>(data: T, init?: ResponseInit): NextResponse<T> {
-  return NextResponse.json(data, init);
+export function apiResponse<T>(
+  data: T,
+  init?: ResponseInit
+): NextResponse<ApiSuccess<T>> {
+  return NextResponse.json({ ok: true, data }, init);
 }
 
 /**
@@ -13,11 +25,39 @@ export function apiResponse<T>(data: T, init?: ResponseInit): NextResponse<T> {
 export function apiError(
   message: string,
   status: number = 500,
+  code: ApiErrorCode = inferErrorCode(status),
   errorId?: string
-): NextResponse<{ error: string; errorId?: string }> {
+): NextResponse<ApiErrorResponse> {
   return NextResponse.json(
-    errorId ? { error: message, errorId } : { error: message },
+    { ok: false, code, error: message, ...(errorId ? { errorId } : {}) },
     { status }
+  );
+}
+
+export function apiValidationError(
+  message: string,
+  fields: ApiFieldError[],
+  status: number = 400
+): NextResponse<ApiValidationErrorResponse> {
+  return NextResponse.json(
+    { ok: false, code: "VALIDATION_ERROR", error: message, fields },
+    { status }
+  );
+}
+
+export function apiUnsupported(
+  feature: string,
+  mode: string,
+  message: string
+): NextResponse<ApiUnsupportedResponse> {
+  return NextResponse.json(
+    {
+      ok: false,
+      code: "UNSUPPORTED",
+      error: message,
+      unsupported: { feature, mode },
+    },
+    { status: 501 }
   );
 }
 
@@ -34,11 +74,11 @@ function newErrorId(): string {
 
 export async function handleApiError<T>(
   fn: () => Promise<T | NextResponse>
-): Promise<NextResponse<T | { error: string; errorId?: string }>> {
+): Promise<NextResponse<ApiResult<T>>> {
   try {
     const data = await fn();
     if (data instanceof Response) {
-      return data as NextResponse<T | { error: string; errorId?: string }>;
+      return data as NextResponse<ApiResult<T>>;
     }
 
     return apiResponse(data);
@@ -47,10 +87,7 @@ export async function handleApiError<T>(
     // their own status and an intentional message — surface them as-is.
     if (isPublicApiError(err)) {
       if (err instanceof ValidationError && err.fields) {
-        return NextResponse.json(
-          { error: err.message, errors: err.fields },
-          { status: err.statusCode }
-        ) as NextResponse<T | { error: string; errorId?: string }>;
+        return apiValidationError(err.message, err.fields, err.statusCode);
       }
       return apiError(err.message, err.statusCode);
     }
@@ -59,6 +96,15 @@ export async function handleApiError<T>(
     // a correlation id, but never return the raw message to the client.
     const errorId = newErrorId();
     console.error(`API Error [${errorId}]:`, err);
-    return apiError("An unexpected error occurred", 500, errorId);
+    return apiError("An unexpected error occurred", 500, "SERVER_ERROR", errorId);
   }
+}
+
+function inferErrorCode(status: number): ApiErrorCode {
+  if (status === 401) return "UNAUTHORIZED";
+  if (status === 403) return "FORBIDDEN";
+  if (status === 404) return "NOT_FOUND";
+  if (status === 502) return "UPSTREAM_ERROR";
+  if (status >= 500) return "SERVER_ERROR";
+  return "BAD_REQUEST";
 }

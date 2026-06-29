@@ -7,30 +7,30 @@ import {
   getPassRepository,
 } from "../lib/repositories/factory";
 import {
-  PATCH as PATCH_MEMBER,
-  POST as POST_MEMBER,
-} from "../app/api/members/route";
-import {
-  PATCH as PATCH_PASS,
-  POST as POST_PASS,
-} from "../app/api/passes/route";
+  validateMemberCreatePayload,
+  validateMemberUpdatePayload,
+  validatePassCreatePayload,
+  validatePassUpdatePayload,
+} from "../lib/validation/mutations";
 
 process.env.DASHBOARD_API_MODE = "mock";
 process.env.DASHBOARD_STORAGE_MODE = "mock";
 
 const VALID_WALLET = "0x742d35Cc6634C0532925a3b8879539d43374e290";
 
-function jsonRequest(url: string, body: unknown): Request {
-  return new Request(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
+type MutationValidationResult =
+  | ReturnType<typeof validatePassCreatePayload>
+  | ReturnType<typeof validatePassUpdatePayload>
+  | ReturnType<typeof validateMemberCreatePayload>
+  | ReturnType<typeof validateMemberUpdatePayload>;
 
-async function errorFields(response: Response): Promise<string[]> {
-  const body = await response.json();
-  return body.errors.map((error: { field: string }) => error.field);
+function errorFields(result: MutationValidationResult): string[] {
+  assert.equal(result.valid, false);
+  if (result.valid) {
+    throw new Error("Expected validation to fail");
+  }
+
+  return result.errors.map((error: { field: string }) => error.field);
 }
 
 beforeEach(() => {
@@ -38,147 +38,104 @@ beforeEach(() => {
 });
 
 describe("pass mutation validation", () => {
-  test("POST /api/passes accepts valid payloads in mock mode", async () => {
-    const response = await POST_PASS(
-      jsonRequest("https://example.test/api/passes", {
+  test("accepts valid pass create payloads in mock mode", async () => {
+    const validation = validatePassCreatePayload({
         name: "Season Pass",
         description: "Access for this season",
         price: 0.25,
         maxSupply: 100,
-      })
-    );
-    const body = await response.json();
+    });
+    assert.equal(validation.valid, true);
+    if (!validation.valid) {
+      throw new Error("Expected validation to pass");
+    }
 
-    assert.equal(response.status, 200);
-    assert.equal(body.name, "Season Pass");
-    assert.equal(body.status, "draft");
-    assert.equal(body.currentSupply, 0);
-    assert.ok(body.id);
-    assert.ok(body.createdAt);
+    const pass = await getPassRepository().create(validation.data);
+    assert.equal(pass.name, "Season Pass");
+    assert.equal(pass.status, "draft");
+    assert.equal(pass.currentSupply, 0);
+    assert.ok(pass.id);
+    assert.ok(pass.createdAt);
   });
 
-  test("POST /api/passes returns field errors for missing required fields", async () => {
-    const response = await POST_PASS(
-      jsonRequest("https://example.test/api/passes", {
-        description: "",
-      })
-    );
-
-    assert.equal(response.status, 400);
-    assert.deepEqual(await errorFields(response), ["name", "description"]);
-  });
-
-  test("PATCH /api/passes rejects invalid status and supply values", async () => {
-    const pass = await getPassRepository().create({
-      name: "Patch Target",
-      description: "Patch target",
-      status: "draft",
-      currentSupply: 0,
+  test("returns field errors for missing required pass fields", () => {
+    const result = validatePassCreatePayload({
+      description: "",
     });
 
-    const response = await PATCH_PASS(
-      jsonRequest(`https://example.test/api/passes?id=${pass.id}`, {
-        status: "archived",
-        currentSupply: -1,
-        maxSupply: 1.5,
-      })
-    );
+    assert.deepEqual(errorFields(result), ["name", "description"]);
+  });
 
-    assert.equal(response.status, 400);
-    assert.deepEqual(await errorFields(response), [
+  test("rejects invalid pass status and supply values", () => {
+    const result = validatePassUpdatePayload({
+      status: "archived",
+      currentSupply: -1,
+      maxSupply: 1.5,
+    });
+
+    assert.deepEqual(errorFields(result), [
       "maxSupply",
       "currentSupply",
       "status",
     ]);
   });
 
-  test("POST /api/passes rejects malformed payloads", async () => {
-    const response = await POST_PASS(
-      new Request("https://example.test/api/passes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{",
-      })
-    );
+  test("rejects malformed pass payloads", () => {
+    const result = validatePassCreatePayload("not an object");
 
-    assert.equal(response.status, 400);
-    assert.deepEqual(await errorFields(response), ["body"]);
+    assert.deepEqual(errorFields(result), ["body"]);
   });
 
-  test("PATCH /api/passes rejects server-owned fields", async () => {
-    const pass = await getPassRepository().create({
-      name: "Server Owned",
-      description: "Server owned",
-      status: "draft",
-      currentSupply: 0,
+  test("rejects server-owned pass fields", () => {
+    const result = validatePassUpdatePayload({
+      id: "client-id",
+      createdAt: "2020-01-01T00:00:00.000Z",
     });
 
-    const response = await PATCH_PASS(
-      jsonRequest(`https://example.test/api/passes?id=${pass.id}`, {
-        id: "client-id",
-        createdAt: "2020-01-01T00:00:00.000Z",
-      })
-    );
-
-    assert.equal(response.status, 400);
-    assert.deepEqual(await errorFields(response), ["id", "createdAt"]);
+    assert.deepEqual(errorFields(result), ["id", "createdAt"]);
   });
 });
 
 describe("member mutation validation", () => {
-  test("POST /api/members accepts valid payloads in mock mode", async () => {
-    const response = await POST_MEMBER(
-      jsonRequest("https://example.test/api/members", {
+  test("accepts valid member create payloads in mock mode", async () => {
+    const validation = validateMemberCreatePayload({
         name: "Ada",
         wallet: VALID_WALLET,
         roles: ["member", "contributor"],
-      })
-    );
-    const body = await response.json();
+    });
+    assert.equal(validation.valid, true);
+    if (!validation.valid) {
+      throw new Error("Expected validation to pass");
+    }
 
-    assert.equal(response.status, 200);
-    assert.equal(body.name, "Ada");
-    assert.equal(body.wallet, VALID_WALLET);
-    assert.equal(body.status, "pending");
-    assert.deepEqual(body.roles, ["member", "contributor"]);
-    assert.ok(body.id);
-    assert.ok(body.joinedAt);
-    assert.ok(body.lastActive);
+    const member = await getMemberRepository().create(validation.data);
+    assert.equal(member.name, "Ada");
+    assert.equal(member.wallet, VALID_WALLET);
+    assert.equal(member.status, "pending");
+    assert.deepEqual(member.roles, ["member", "contributor"]);
+    assert.ok(member.id);
+    assert.ok(member.joinedAt);
+    assert.ok(member.lastActive);
   });
 
-  test("POST /api/members returns field errors for missing required fields", async () => {
-    const response = await POST_MEMBER(
-      jsonRequest("https://example.test/api/members", {
-        roles: [],
-      })
-    );
-
-    assert.equal(response.status, 400);
-    assert.deepEqual(await errorFields(response), ["name", "wallet"]);
-  });
-
-  test("PATCH /api/members rejects invalid wallet, status, roles, and dates", async () => {
-    const member = await getMemberRepository().create({
-      name: "Patch Member",
-      wallet: VALID_WALLET,
-      status: "pending",
-      roles: ["member"],
-      joinedAt: new Date().toISOString(),
-      lastActive: new Date().toISOString(),
+  test("returns field errors for missing required member fields", () => {
+    const result = validateMemberCreatePayload({
+      roles: [],
     });
 
-    const response = await PATCH_MEMBER(
-      jsonRequest(`https://example.test/api/members?id=${member.id}`, {
-        wallet: "0xnot-a-wallet",
-        status: "banned",
-        roles: ["owner"],
-        joinedAt: "not-a-date",
-        lastActive: 123,
-      })
-    );
+    assert.deepEqual(errorFields(result), ["name", "wallet"]);
+  });
 
-    assert.equal(response.status, 400);
-    assert.deepEqual(await errorFields(response), [
+  test("rejects invalid member wallet, status, roles, and dates", () => {
+    const result = validateMemberUpdatePayload({
+      wallet: "0xnot-a-wallet",
+      status: "banned",
+      roles: ["owner"],
+      joinedAt: "not-a-date",
+      lastActive: 123,
+    });
+
+    assert.deepEqual(errorFields(result), [
       "wallet",
       "roles.0",
       "joinedAt",
@@ -187,37 +144,18 @@ describe("member mutation validation", () => {
     ]);
   });
 
-  test("POST /api/members rejects malformed payloads", async () => {
-    const response = await POST_MEMBER(
-      new Request("https://example.test/api/members", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "[",
-      })
-    );
+  test("rejects malformed member payloads", () => {
+    const result = validateMemberCreatePayload(null);
 
-    assert.equal(response.status, 400);
-    assert.deepEqual(await errorFields(response), ["body"]);
+    assert.deepEqual(errorFields(result), ["body"]);
   });
 
-  test("PATCH /api/members rejects server-owned fields", async () => {
-    const member = await getMemberRepository().create({
-      name: "Server Owned Member",
-      wallet: VALID_WALLET,
-      status: "pending",
-      roles: ["member"],
-      joinedAt: new Date().toISOString(),
-      lastActive: new Date().toISOString(),
+  test("rejects server-owned member fields", () => {
+    const result = validateMemberUpdatePayload({
+      id: "client-id",
+      createdAt: "2020-01-01T00:00:00.000Z",
     });
 
-    const response = await PATCH_MEMBER(
-      jsonRequest(`https://example.test/api/members?id=${member.id}`, {
-        id: "client-id",
-        createdAt: "2020-01-01T00:00:00.000Z",
-      })
-    );
-
-    assert.equal(response.status, 400);
-    assert.deepEqual(await errorFields(response), ["id", "createdAt"]);
+    assert.deepEqual(errorFields(result), ["id", "createdAt"]);
   });
 });

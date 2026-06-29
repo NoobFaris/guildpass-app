@@ -11,7 +11,7 @@ describe("fetchActivity", () => {
     globalThis.fetch = async (input: string | URL | Request) => {
       urls.push(String(input));
       return new Response(
-        JSON.stringify({ events: [], nextCursor: null, total: 0 }),
+        JSON.stringify({ ok: true, data: { events: [], nextCursor: null, total: 0 } }),
         { status: 200, headers: { "content-type": "application/json" } }
       );
     };

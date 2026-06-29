@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { apiError } from "@/lib/api-helpers";
+import { apiError, apiResponse, apiValidationError } from "@/lib/api-helpers";
 import { filterActivityEvents, parseActivityQuery } from "@/lib/activity/query";
 import { activityStorage } from "@/lib/activity/storage";
 import { getActivityRepository } from "@/lib/repositories/factory";
@@ -9,10 +9,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const parsed = parseActivityQuery(url.searchParams);
 
   if (!parsed.ok) {
-    return NextResponse.json(
-      { error: "Invalid activity query", errors: parsed.errors },
-      { status: 400 }
-    );
+    return apiValidationError("Invalid activity query", parsed.errors);
   }
 
   try {
@@ -31,7 +28,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
 
     const result = filterActivityEvents(merged, parsed.value);
-    return NextResponse.json(result);
+    return apiResponse(result);
   } catch (error) {
     console.error("Error fetching activity:", error);
     return apiError("Failed to fetch activity", 500);

@@ -6,6 +6,7 @@ import StatusBadge from "@/components/StatusBadge";
 import LastUpdated from "@/components/LastUpdated";
 import { useActivityFeed } from "@/lib/hooks/useActivityFeed";
 import { mockPasses, mockGuilds, mockMembers, type Member as MockMember } from "@/lib/mock-data";
+import { readApiResult } from "@/lib/api-client";
 import { useEffect, useState } from "react";
 
 export default function DashboardPage() {
@@ -26,18 +27,15 @@ export default function DashboardPage() {
         ]);
 
         if (mounted) {
-          if (passesRes.ok) {
-            const p = await passesRes.json();
-            if (Array.isArray(p)) setPassesCount(p.length);
-          }
-          if (guildsRes.ok) {
-            const g = await guildsRes.json();
-            if (Array.isArray(g)) setGuildsCount(g.length);
-          }
-          if (membersRes.ok) {
-            const m = await membersRes.json();
-            if (Array.isArray(m)) setActiveMembersCount(m.filter((mm: MockMember) => mm.status === 'active').length);
-          }
+          const [passes, guilds, members] = await Promise.all([
+            readApiResult<typeof mockPasses>(passesRes),
+            readApiResult<typeof mockGuilds>(guildsRes),
+            readApiResult<MockMember[]>(membersRes),
+          ]);
+
+          setPassesCount(passes.length);
+          setGuildsCount(guilds.length);
+          setActiveMembersCount(members.filter((mm) => mm.status === 'active').length);
         }
       } catch (err) {
         console.warn('Dashboard stats fetch failed, using mock counts', err);

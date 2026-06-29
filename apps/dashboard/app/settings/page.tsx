@@ -22,6 +22,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useSession } from "@/lib/hooks/useSession";
 import { canEditSettings } from "@/lib/permissions";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
+import { readApiResult } from "@/lib/api-client";
 import type { DashboardSettings } from "@/lib/settings";
 import { useState, useRef, useEffect } from "react";
 
@@ -40,9 +41,10 @@ export default function SettingsPage() {
   // defaults. GET /api/settings requires settings:read, held by every role.
   useEffect(() => {
     let active = true;
-    fetch("/api/settings")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/settings");
+        const data = await readApiResult<DashboardSettings>(res);
         if (!active || !data) return;
         if (typeof data.workspaceName === "string") setWorkspaceName(data.workspaceName);
         if (typeof data.timezone === "string") setTimezone(data.timezone);
@@ -54,10 +56,12 @@ export default function SettingsPage() {
           displayName: data.displayName,
           email: data.email,
         };
-      })
-      .catch(() => {
+      } catch {
         /* keep the default values if the read fails */
-      });
+      }
+    }
+
+    loadSettings();
     return () => {
       active = false;
     };
@@ -71,16 +75,7 @@ export default function SettingsPage() {
         body: JSON.stringify(data),
       });
 
-      if (res.status === 403) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(`Access denied: ${body.error ?? "settings:write permission required"}`);
-      }
-
-      if (!res.ok) {
-        throw new Error("An unexpected error occurred. Please try again.");
-      }
-
-      return res.json();
+      return readApiResult<DashboardSettings>(res);
     },
     onOptimisticUpdate: (_data) => {
       previousSettingsRef.current = { workspaceName, timezone, displayName, email };
