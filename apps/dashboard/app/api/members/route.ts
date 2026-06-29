@@ -7,7 +7,11 @@ import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
 import { IntegrationClient } from "@guildpass/integration-client";
 import { getEnv, getApiMode } from "@/lib/env";
 import { getMemberRepository } from "@/lib/repositories/factory";
-import { validateRoles } from "@/lib/member-roles";
+import {
+  malformedPayloadError,
+  validateMemberCreatePayload,
+  validateMemberUpdatePayload,
+} from "@/lib/validation/mutations";
 
 /**
  * GET /api/members
@@ -103,38 +107,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     throw err;
   }
 
-  let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
-  }
-
-  // Roles are optional on create, but if provided they must be supported.
-  let roles: string[] = [];
-  if (body.roles !== undefined) {
-    const result = validateRoles(body.roles);
-    if (!result.ok) {
-      return NextResponse.json(
-        { error: "Unsupported role value(s).", invalid: result.invalid },
-        { status: 400 }
-      );
-    }
-    roles = result.roles;
-  }
-
   return handleApiError(async () => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ errors: malformedPayloadError() }, { status: 400 });
+    }
+
+    const validation = validateMemberCreatePayload(body);
+    if (!validation.valid) {
+      return NextResponse.json({ errors: validation.errors }, { status: 400 });
+    }
+
     const memberRepository = getMemberRepository();
-    const newMember = {
-      id: crypto.randomUUID(),
-      name: typeof body.name === "string" ? body.name : "Unknown",
-      wallet: typeof body.wallet === "string" ? body.wallet : "",
-      status: (body.status as Member["status"]) ?? "pending",
-      roles,
-      joinedAt: new Date().toISOString(),
-      lastActive: new Date().toISOString(),
-    };
-    return await memberRepository.create(newMember);
+    return await memberRepository.create(validation.data);
   });
 }
 
@@ -157,30 +144,22 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
   if (!id) return apiError("Missing member ID", 400);
 
-  let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
-  }
-
-  // Reject unsupported role values before touching the repository; normalise
-  // (de-duplicate) the accepted ones.
-  if (body.roles !== undefined) {
-    const result = validateRoles(body.roles);
-    if (!result.ok) {
-      return NextResponse.json(
-        { error: "Unsupported role value(s).", invalid: result.invalid },
-        { status: 400 }
-      );
-    }
-    body.roles = result.roles;
-  }
-
   return handleApiError(async () => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ errors: malformedPayloadError() }, { status: 400 });
+    }
+
+    const validation = validateMemberUpdatePayload(body);
+    if (!validation.valid) {
+      return NextResponse.json({ errors: validation.errors }, { status: 400 });
+    }
+
     const memberRepository = getMemberRepository();
-    const updated = await memberRepository.update(id, body);
-    if (!updated) throw new NotFoundError("Member not found.");
+    const updated = await memberRepository.update(id, validation.data);
+    if (!updated) throw new Error("Member not found or update failed");
     return updated;
   });
 }

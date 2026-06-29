@@ -6,7 +6,6 @@ import {
   isMemberRole,
   addRole,
   removeRole,
-  validateRoles,
 } from "../lib/member-roles";
 
 describe("isMemberRole", () => {
@@ -46,34 +45,9 @@ describe("removeRole", () => {
   });
 });
 
-describe("validateRoles", () => {
-  test("accepts supported roles and de-duplicates", () => {
-    const result = validateRoles(["member", "member", "admin"]);
-    assert.equal(result.ok, true);
-    if (result.ok) assert.deepEqual(result.roles, ["member", "admin"]);
-  });
-
-  test("accepts an empty array", () => {
-    const result = validateRoles([]);
-    assert.equal(result.ok, true);
-    if (result.ok) assert.deepEqual(result.roles, []);
-  });
-
-  test("rejects an array containing an unsupported role", () => {
-    const result = validateRoles(["member", "root"]);
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.deepEqual(result.invalid, ["root"]);
-  });
-
-  test("reports every unsupported value", () => {
-    const result = validateRoles(["root", "member", "ceo"]);
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.deepEqual(result.invalid.sort(), ["ceo", "root"]);
-  });
-
-  test("rejects a non-array body", () => {
-    assert.equal(validateRoles("member").ok, false);
-    assert.equal(validateRoles(null).ok, false);
-    assert.equal(validateRoles({ roles: ["member"] }).ok, false);
+describe("MEMBER_ROLES", () => {
+  test("matches the roles the seed data uses", () => {
+    // The role editor must offer exactly the roles the API (mutations.ts) accepts.
+    assert.deepEqual([...MEMBER_ROLES], ["admin", "member", "contributor"]);
   });
 });

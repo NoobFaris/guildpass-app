@@ -1,22 +1,18 @@
 /**
  * lib/member-roles.ts
  *
- * Allowed *member-record* roles and the pure helpers used to edit a member's
- * role list. These are intentionally separate from the dashboard access-control
- * roles (owner / admin / moderator / readonly in lib/auth/session.ts), which
- * govern what a *session* may do. A member record's roles are descriptive
- * labels on the membership itself — see issue #74's note.
+ * Single source of truth for the allowed *member-record* roles, plus the pure
+ * helpers used to edit a member's role list in the UI. These are intentionally
+ * separate from the dashboard access-control roles (owner / admin / moderator /
+ * readonly in lib/auth/session.ts), which govern what a *session* may do — see
+ * issue #74's note.
  *
- * The helpers are pure so both the UI (RoleEditor) and the API route validation
- * share one source of truth and can be unit-tested without a DOM.
+ * The API-side payload validation (lib/validation/mutations.ts) imports
+ * MEMBER_ROLES from here so the role editor can only ever offer values the
+ * server will accept.
  */
 
-export const MEMBER_ROLES = [
-  "admin",
-  "member",
-  "contributor",
-  "moderator",
-] as const;
+export const MEMBER_ROLES = ["admin", "member", "contributor"] as const;
 
 export type MemberRole = (typeof MEMBER_ROLES)[number];
 
@@ -40,27 +36,4 @@ export function addRole(roles: string[], role: string): string[] {
 /** Remove a role from a member's role list (no-op if absent). */
 export function removeRole(roles: string[], role: string): string[] {
   return roles.filter((r) => r !== role);
-}
-
-export type RolesValidationResult =
-  | { ok: true; roles: MemberRole[] }
-  | { ok: false; invalid: string[] };
-
-/**
- * Authoritative validation used by the API route before persisting. Ensures the
- * input is an array of supported roles, returns the de-duplicated list, or the
- * list of unsupported values so the caller can return a 400.
- */
-export function validateRoles(input: unknown): RolesValidationResult {
-  if (!Array.isArray(input)) {
-    return { ok: false, invalid: ["roles must be an array"] };
-  }
-
-  const invalid = input.filter((r) => !isMemberRole(r)).map((r) => String(r));
-  if (invalid.length > 0) {
-    return { ok: false, invalid };
-  }
-
-  const deduped = Array.from(new Set(input as MemberRole[]));
-  return { ok: true, roles: deduped };
 }
