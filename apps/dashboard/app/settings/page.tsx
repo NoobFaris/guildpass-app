@@ -22,7 +22,8 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useSession } from "@/lib/hooks/useSession";
 import { canEditSettings } from "@/lib/permissions";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
-import { useState, useRef } from "react";
+import type { DashboardSettings } from "@/lib/settings";
+import { useState, useRef, useEffect } from "react";
 
 export default function SettingsPage() {
   const session = useSession();
@@ -34,7 +35,35 @@ export default function SettingsPage() {
 
   const previousSettingsRef = useRef({ workspaceName, timezone, displayName, email });
 
-  const saveMutation = useOptimisticMutation<{ message: string }, any>({
+  // Hydrate the form from the server-side settings source on mount, so the page
+  // reflects persisted values (e.g. after a refresh) rather than the hard-coded
+  // defaults. GET /api/settings requires settings:read, held by every role.
+  useEffect(() => {
+    let active = true;
+    fetch("/api/settings")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data) return;
+        if (typeof data.workspaceName === "string") setWorkspaceName(data.workspaceName);
+        if (typeof data.timezone === "string") setTimezone(data.timezone);
+        if (typeof data.displayName === "string") setDisplayName(data.displayName);
+        if (typeof data.email === "string") setEmail(data.email);
+        previousSettingsRef.current = {
+          workspaceName: data.workspaceName,
+          timezone: data.timezone,
+          displayName: data.displayName,
+          email: data.email,
+        };
+      })
+      .catch(() => {
+        /* keep the default values if the read fails */
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const saveMutation = useOptimisticMutation<DashboardSettings, DashboardSettings>({
     mutationFn: async (data) => {
       const res = await fetch("/api/settings", {
         method: "PATCH",
@@ -53,9 +82,9 @@ export default function SettingsPage() {
 
       return res.json();
     },
-    onOptimisticUpdate: (data) => {
+    onOptimisticUpdate: (_data) => {
       previousSettingsRef.current = { workspaceName, timezone, displayName, email };
-      // Note: In a real app, we'd update the state with `data` here.
+      // Note: In a real app, we'd update the state with the patch here.
       // For this mock, we assume the form state is already updated via controlled inputs.
     },
     onRollback: () => {
