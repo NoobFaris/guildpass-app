@@ -103,7 +103,20 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   return handleApiError(async () => {
     const body = await request.json();
-    const memberRepository = getMemberRepository();
+
+const memberRepository = getMemberRepository();
+
+const newMember = {
+  id: crypto.randomUUID(),
+  name: body.name ?? "Unknown",
+  wallet: body.wallet ?? "",
+  status: body.status ?? "pending",
+  roles: Array.isArray(body.roles) ? body.roles : [],
+  joinedAt: new Date().toISOString(),
+  lastActive: new Date().toISOString(),
+};
+
+return await memberRepository.create(newMember);;
     return await memberRepository.create(body);
   });
 }

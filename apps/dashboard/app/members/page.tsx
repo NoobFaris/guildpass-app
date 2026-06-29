@@ -34,6 +34,14 @@ export default function MembersPage() {
   const previousMembersRef = useRef<MockMember[]>(members);
   const apiMode = getClientApiMode();
 
+    const [isInviteOpen, setIsInviteOpen] = useState(false);
+    const [inviteLoading, setInviteLoading] = useState(false);
+
+    const [form, setForm] = useState({
+    name: "",
+    wallet: "",
+});
+
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -181,13 +189,107 @@ export default function MembersPage() {
         {/* Invite button — write roles only */}
         {canWrite && listState !== "unsupported" && (
           <button
-            id="btn-invite-member"
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
+               id="btn-invite-member"
+               onClick={() => setIsInviteOpen(true)}
+               className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+               >
             <span>＋</span> Invite Member
           </button>
         )}
       </div>
+
+      {isInviteOpen && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-xl w-[400px] space-y-3">
+
+      <h2 className="text-lg font-semibold">Invite Member</h2>
+
+      <input
+        placeholder="Name"
+        value={form.name}
+        onChange={(e) =>
+          setForm({ ...form, name: e.target.value })
+        }
+        className="w-full border p-2 rounded"
+      />
+
+      <input
+        placeholder="Wallet"
+        value={form.wallet}
+        onChange={(e) =>
+          setForm({ ...form, wallet: e.target.value })
+        }
+        className="w-full border p-2 rounded"
+      />
+
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setIsInviteOpen(false)}>
+          Cancel
+        </button>
+
+        <button
+  disabled={inviteLoading}
+  onClick={async () => {
+    try {
+      if (!form.name.trim()) {
+        alert("Name is required");
+        return;
+      }
+
+      if (!form.wallet.trim()) {
+        alert("Wallet is required");
+        return;
+      }
+
+      setInviteLoading(true);
+
+      const res = await fetch("/api/members", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: form.name,
+          wallet: form.wallet,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to invite member");
+      }
+
+      const newMember = await res.json();
+
+// Fallback safety (prevents roles/status undefined bugs)
+const safeMember = {
+  ...newMember,
+  roles: newMember.roles ?? [],
+  status: newMember.status ?? "pending",
+};
+
+setMembers((prev) => [safeMember, ...prev]);
+
+      setIsInviteOpen(false);
+
+      setForm({
+        name: "",
+        wallet: "",
+      });
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setInviteLoading(false);
+    }
+  }}
+>
+  {inviteLoading ? "Inviting..." : "Invite"}
+</button>
+      </div>
+
+    </div>
+  </div>
+)}
 
       {/* ── Members table ───────────────────────────────────────────────── */}
       {listState !== "unsupported" && (
@@ -223,7 +325,7 @@ export default function MembersPage() {
                       <StatusBadge status={member.status} />
                     </td>
                     <td className="px-6 py-4 text-slate-600">
-                      {member.roles.map((role) => (
+                      {(member.roles ?? []).map((role) => (
                         <span
                           key={role}
                           className="mr-2 px-2 py-1 bg-slate-100 rounded text-xs"
@@ -231,7 +333,7 @@ export default function MembersPage() {
                           {role}
                         </span>
                       ))}
-                      {member.roles.length === 0 && (
+                      {(member.roles ?? []).length === 0 && (
                         <span className="text-slate-400 text-xs italic">None</span>
                       )}
                     </td>

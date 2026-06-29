@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -49,10 +53,10 @@ importers:
   apps/dashboard:
     dependencies:
       '@guildpass/integration-client':
-        specifier: file:../../packages/integration-client
+        specifier: workspace:*
         version: link:../../packages/integration-client
       '@guildpass/webhook-utils':
-        specifier: file:../../packages/webhook-utils
+        specifier: workspace:*
         version: link:../../packages/webhook-utils
       next:
         specifier: 14.2.21
@@ -6544,7 +6548,7 @@ snapshots:
       escape-html: 1.0.3
       eta: 2.2.0
       eval: 0.1.8
-      file-loader: 6.2.0(webpack@5.107.2(postcss@8.5.15))
+      file-loader: 6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15))
       fs-extra: 11.3.5
       html-minifier-terser: 7.2.0
       html-tags: 3.3.1
@@ -6569,10 +6573,10 @@ snapshots:
       semver: 7.8.4
       serve-handler: 6.1.7
       shelljs: 0.8.5
-      terser-webpack-plugin: 5.6.1(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(webpack@5.107.2(postcss@8.5.15))
+      terser-webpack-plugin: 5.6.1(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15))
       tslib: 2.8.1
       update-notifier: 6.0.2
-      url-loader: 4.1.1(file-loader@6.2.0(webpack@5.107.2(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15))
+      url-loader: 4.1.1(file-loader@6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15))
       webpack: 5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
       webpack-bundle-analyzer: 4.10.2
       webpack-dev-server: 4.15.2(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15))
@@ -6620,7 +6624,7 @@ snapshots:
       '@slorber/remark-comment': 1.0.0
       escape-html: 1.0.3
       estree-util-value-to-estree: 3.5.0
-      file-loader: 6.2.0(webpack@5.107.2(postcss@8.5.15))
+      file-loader: 6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15))
       fs-extra: 11.3.5
       image-size: 1.2.1
       mdast-util-mdx: 3.0.0
@@ -6636,9 +6640,54 @@ snapshots:
       tslib: 2.8.1
       unified: 11.0.5
       unist-util-visit: 5.1.0
-      url-loader: 4.1.1(file-loader@6.2.0(webpack@5.107.2(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15))
+      url-loader: 4.1.1(file-loader@6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15))
       vfile: 6.0.3
       webpack: 5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+    transitivePeerDependencies:
+      - '@docusaurus/types'
+      - '@minify-html/node'
+      - '@swc/core'
+      - '@swc/css'
+      - '@swc/html'
+      - clean-css
+      - cssnano
+      - csso
+      - esbuild
+      - html-minifier-terser
+      - lightningcss
+      - postcss
+      - supports-color
+      - uglify-js
+      - webpack-cli
+
+  '@docusaurus/mdx-loader@3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
+    dependencies:
+      '@docusaurus/logger': 3.2.1
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
+      '@mdx-js/mdx': 3.1.1
+      '@slorber/remark-comment': 1.0.0
+      escape-html: 1.0.3
+      estree-util-value-to-estree: 3.5.0
+      file-loader: 6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15))
+      fs-extra: 11.3.5
+      image-size: 1.2.1
+      mdast-util-mdx: 3.0.0
+      mdast-util-to-string: 4.0.0
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+      rehype-raw: 7.0.0
+      remark-directive: 3.0.1
+      remark-emoji: 4.0.1
+      remark-frontmatter: 5.0.0
+      remark-gfm: 4.0.1
+      stringify-object: 3.3.0
+      tslib: 2.8.1
+      unified: 11.0.5
+      unist-util-visit: 5.1.0
+      url-loader: 4.1.1(file-loader@6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15))
+      vfile: 6.0.3
+      webpack: 5.107.2(postcss@8.5.15)
     transitivePeerDependencies:
       - '@docusaurus/types'
       - '@minify-html/node'
@@ -6688,11 +6737,11 @@ snapshots:
     dependencies:
       '@docusaurus/core': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/logger': 3.2.1
-      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       '@docusaurus/utils-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))
-      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       cheerio: 1.2.0
       feed: 4.2.2
       fs-extra: 11.3.5
@@ -6704,7 +6753,7 @@ snapshots:
       tslib: 2.8.1
       unist-util-visit: 5.1.0
       utility-types: 3.11.0
-      webpack: 5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      webpack: 5.107.2(postcss@8.5.15)
     transitivePeerDependencies:
       - '@minify-html/node'
       - '@parcel/css'
@@ -6733,12 +6782,12 @@ snapshots:
     dependencies:
       '@docusaurus/core': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/logger': 3.2.1
-      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@docusaurus/module-type-aliases': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       '@docusaurus/utils-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))
-      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       '@types/react-router-config': 5.0.11
       combine-promises: 1.2.0
       fs-extra: 11.3.5
@@ -6748,7 +6797,7 @@ snapshots:
       react-dom: 18.2.0(react@18.2.0)
       tslib: 2.8.1
       utility-types: 3.11.0
-      webpack: 5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      webpack: 5.107.2(postcss@8.5.15)
     transitivePeerDependencies:
       - '@minify-html/node'
       - '@parcel/css'
@@ -6776,15 +6825,15 @@ snapshots:
   '@docusaurus/plugin-content-pages@3.2.1(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)':
     dependencies:
       '@docusaurus/core': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
-      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
-      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       fs-extra: 11.3.5
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
       tslib: 2.8.1
-      webpack: 5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      webpack: 5.107.2(postcss@8.5.15)
     transitivePeerDependencies:
       - '@minify-html/node'
       - '@parcel/css'
@@ -6813,7 +6862,7 @@ snapshots:
     dependencies:
       '@docusaurus/core': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       fs-extra: 11.3.5
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
@@ -6847,7 +6896,7 @@ snapshots:
     dependencies:
       '@docusaurus/core': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
       tslib: 2.8.1
@@ -6879,7 +6928,7 @@ snapshots:
     dependencies:
       '@docusaurus/core': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       '@types/gtag.js': 0.0.12
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
@@ -6912,7 +6961,7 @@ snapshots:
     dependencies:
       '@docusaurus/core': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
       tslib: 2.8.1
@@ -6945,9 +6994,9 @@ snapshots:
       '@docusaurus/core': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/logger': 3.2.1
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       '@docusaurus/utils-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))
-      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       fs-extra: 11.3.5
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
@@ -7030,7 +7079,7 @@ snapshots:
   '@docusaurus/theme-classic@3.2.1(@types/react@19.2.17)(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)':
     dependencies:
       '@docusaurus/core': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
-      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@docusaurus/module-type-aliases': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@docusaurus/plugin-content-blog': 3.2.1(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/plugin-content-docs': 3.2.1(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
@@ -7038,9 +7087,9 @@ snapshots:
       '@docusaurus/theme-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/theme-translations': 3.2.1
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
-      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       '@docusaurus/utils-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))
-      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       '@mdx-js/react': 3.1.1(@types/react@19.2.17)(react@18.2.0)
       clsx: 2.1.1
       copy-text-to-clipboard: 3.2.2
@@ -7082,12 +7131,12 @@ snapshots:
 
   '@docusaurus/theme-common@3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)':
     dependencies:
-      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      '@docusaurus/mdx-loader': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@docusaurus/module-type-aliases': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@docusaurus/plugin-content-blog': 3.2.1(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/plugin-content-docs': 3.2.1(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/plugin-content-pages': 3.2.1(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
-      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       '@docusaurus/utils-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))
       '@types/history': 4.7.11
       '@types/react': 19.2.17
@@ -7132,8 +7181,8 @@ snapshots:
       '@docusaurus/plugin-content-docs': 3.2.1(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/theme-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(eslint@10.5.0(jiti@1.21.7))(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.9.3)
       '@docusaurus/theme-translations': 3.2.1
-      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
-      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
+      '@docusaurus/utils-validation': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
       algoliasearch: 4.27.0
       algoliasearch-helper: 3.29.1(algoliasearch@4.27.0)
       clsx: 2.1.1
@@ -7188,7 +7237,7 @@ snapshots:
       react-dom: 18.2.0(react@18.2.0)
       react-helmet-async: 1.3.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       utility-types: 3.11.0
-      webpack: 5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+      webpack: 5.107.2(postcss@8.5.15)
       webpack-merge: 5.10.0
     transitivePeerDependencies:
       - '@minify-html/node'
@@ -7237,13 +7286,38 @@ snapshots:
       - uglify-js
       - webpack-cli
 
+  '@docusaurus/utils-validation@3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)':
+    dependencies:
+      '@docusaurus/logger': 3.2.1
+      '@docusaurus/utils': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)
+      '@docusaurus/utils-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))
+      joi: 17.13.4
+      js-yaml: 4.2.0
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - '@docusaurus/types'
+      - '@minify-html/node'
+      - '@swc/core'
+      - '@swc/css'
+      - '@swc/html'
+      - clean-css
+      - cssnano
+      - csso
+      - esbuild
+      - html-minifier-terser
+      - lightningcss
+      - postcss
+      - supports-color
+      - uglify-js
+      - webpack-cli
+
   '@docusaurus/utils@3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)':
     dependencies:
       '@docusaurus/logger': 3.2.1
       '@docusaurus/utils-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))
       '@svgr/webpack': 6.5.1
       escape-string-regexp: 4.0.0
-      file-loader: 6.2.0(webpack@5.107.2(postcss@8.5.15))
+      file-loader: 6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15))
       fs-extra: 11.3.5
       github-slugger: 1.5.0
       globby: 11.1.0
@@ -7256,8 +7330,47 @@ snapshots:
       resolve-pathname: 3.0.0
       shelljs: 0.8.5
       tslib: 2.8.1
-      url-loader: 4.1.1(file-loader@6.2.0(webpack@5.107.2(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15))
+      url-loader: 4.1.1(file-loader@6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15))
       webpack: 5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
+    optionalDependencies:
+      '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+    transitivePeerDependencies:
+      - '@minify-html/node'
+      - '@swc/core'
+      - '@swc/css'
+      - '@swc/html'
+      - clean-css
+      - cssnano
+      - csso
+      - esbuild
+      - html-minifier-terser
+      - lightningcss
+      - postcss
+      - supports-color
+      - uglify-js
+      - webpack-cli
+
+  '@docusaurus/utils@3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))(postcss@8.5.15)':
+    dependencies:
+      '@docusaurus/logger': 3.2.1
+      '@docusaurus/utils-common': 3.2.1(@docusaurus/types@3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0))
+      '@svgr/webpack': 6.5.1
+      escape-string-regexp: 4.0.0
+      file-loader: 6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15))
+      fs-extra: 11.3.5
+      github-slugger: 1.5.0
+      globby: 11.1.0
+      gray-matter: 4.0.3
+      jiti: 1.21.7
+      js-yaml: 4.2.0
+      lodash: 4.18.1
+      micromatch: 4.0.8
+      prompts: 2.4.2
+      resolve-pathname: 3.0.0
+      shelljs: 0.8.5
+      tslib: 2.8.1
+      url-loader: 4.1.1(file-loader@6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15))
+      webpack: 5.107.2(postcss@8.5.15)
     optionalDependencies:
       '@docusaurus/types': 3.2.1(postcss@8.5.15)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
     transitivePeerDependencies:
@@ -9235,7 +9348,7 @@ snapshots:
     dependencies:
       flat-cache: 4.0.1
 
-  file-loader@6.2.0(webpack@5.107.2(postcss@8.5.15)):
+  file-loader@6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15)):
     dependencies:
       loader-utils: 2.0.4
       schema-utils: 3.3.0
@@ -11862,7 +11975,7 @@ snapshots:
 
   tapable@2.3.3: {}
 
-  terser-webpack-plugin@5.6.1(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(webpack@5.107.2(postcss@8.5.15)):
+  terser-webpack-plugin@5.6.1(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
@@ -12052,14 +12165,14 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  url-loader@4.1.1(file-loader@6.2.0(webpack@5.107.2(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)):
+  url-loader@4.1.1(file-loader@6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15)))(webpack@5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)):
     dependencies:
       loader-utils: 2.0.4
       mime-types: 2.1.35
       schema-utils: 3.3.0
       webpack: 5.107.2(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)
     optionalDependencies:
-      file-loader: 6.2.0(webpack@5.107.2(postcss@8.5.15))
+      file-loader: 6.2.0(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15))
 
   util-deprecate@1.0.2: {}
 
@@ -12214,7 +12327,46 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 4.3.3
       tapable: 2.3.3
-      terser-webpack-plugin: 5.6.1(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(webpack@5.107.2(postcss@8.5.15))
+      terser-webpack-plugin: 5.6.1(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15))
+      watchpack: 2.5.2
+      webpack-sources: 3.5.0
+    transitivePeerDependencies:
+      - '@minify-html/node'
+      - '@swc/core'
+      - '@swc/css'
+      - '@swc/html'
+      - clean-css
+      - cssnano
+      - csso
+      - esbuild
+      - html-minifier-terser
+      - lightningcss
+      - postcss
+      - uglify-js
+
+  webpack@5.107.2(postcss@8.5.15):
+    dependencies:
+      '@types/estree': 1.0.9
+      '@types/json-schema': 7.0.15
+      '@webassemblyjs/ast': 1.14.1
+      '@webassemblyjs/wasm-edit': 1.14.1
+      '@webassemblyjs/wasm-parser': 1.14.1
+      acorn: 8.17.0
+      acorn-import-phases: 1.0.4(acorn@8.17.0)
+      browserslist: 4.28.2
+      chrome-trace-event: 1.0.4
+      enhanced-resolve: 5.24.0
+      es-module-lexer: 2.1.0
+      eslint-scope: 5.1.1
+      events: 3.3.0
+      glob-to-regexp: 0.4.1
+      graceful-fs: 4.2.11
+      loader-runner: 4.3.2
+      mime-db: 1.54.0
+      neo-async: 2.6.2
+      schema-utils: 4.3.3
+      tapable: 2.3.3
+      terser-webpack-plugin: 5.6.1(clean-css@5.3.3)(cssnano@5.1.15(postcss@8.5.15))(html-minifier-terser@7.2.0)(postcss@8.5.15)(webpack@5.107.2(clean-css@5.3.3)(html-minifier-terser@7.2.0)(postcss@8.5.15))
       watchpack: 2.5.2
       webpack-sources: 3.5.0
     transitivePeerDependencies:
