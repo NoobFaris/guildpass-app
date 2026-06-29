@@ -1,63 +1,31 @@
+import { z } from "zod";
 import type { WebhookPayload } from "./types";
+import { SUPPORTED_WEBHOOK_EVENTS } from "./types";
 
 export type ValidationResult =
-  | { valid: true; payload: WebhookPayload }
-  | { valid: false; error: string; field?: string };
+| { valid: true; payload: WebhookPayload }
+| { valid: false; error: string; field?: string };
 
-const EVENT_DATA_SCHEMA: Record<
-  string,
-  Record<string, "string" | "string?" | "number?">
-> = {
-  "membership.created": { name: "string?", wallet: "string?", id: "string?" },
-  "membership.updated": { name: "string?", wallet: "string?", id: "string?" },
-  "pass.created": { name: "string?", id: "string?" },
-  "pass.updated": { name: "string?", id: "string?" },
-  "guild.updated": { name: "string?", id: "string?" },
-  "verification.completed": { wallet: "string?", id: "string?" },
+// 1. Define specific data schemas
+const DataSchemas = {
+"membership.created": z.object({ name: z.string().optional(), wallet: z.string().optional(), id: z.string().optional() }),
+  "membership.updated": z.object({ name: z.string().optional(), wallet: z.string().optional(), id: z.string().optional() }),
+  "pass.created": z.object({ name: z.string().optional(), id: z.string().optional() }),
+  "pass.updated": z.object({ name: z.string().optional(), id: z.string().optional() }),
+  "guild.updated": z.object({ name: z.string().optional(), id: z.string().optional() }),
+  "verification.completed": z.object({ wallet: z.string().optional(), id: z.string().optional() }),
 };
 
-type SupportedEvent = keyof typeof EVENT_DATA_SCHEMA;
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-function validateDataFields(
-  type: string,
-  data: unknown
-): { field: string; message: string } | null {
-  if (!isPlainObject(data)) {
-    return { field: "data", message: "'data' must be a JSON object" };
-  }
-
-  const schema = EVENT_DATA_SCHEMA[type as SupportedEvent];
-  if (!schema) {
-    return null;
-  }
-
-  for (const [field, rule] of Object.entries(schema)) {
-    const value = data[field];
-    const required = !rule.endsWith("?");
-
-    if (required && (value === undefined || value === null)) {
-      return {
-        field: `data.${field}`,
-        message: `Missing required field 'data.${field}' for '${type}' events`,
-      };
-    }
-
-    if (value !== undefined && value !== null && typeof value !== rule.replace("?", "")) {
-      return {
-        field: `data.${field}`,
-        message: `Field 'data.${field}' must be a ${rule.replace("?", "")} for '${type}' events`,
-      };
-    }
-  }
-
-  return null;
-}
+// 2. Base envelope schema
+const EnvelopeSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  created: z.number().positive(),
+  data: z.record(z.unknown()),
+});
 
 export function validateWebhookPayload(rawBody: string): ValidationResult {
+  // Parse JSON
   let parsed: unknown;
   try {
     parsed = JSON.parse(rawBody);
@@ -65,52 +33,34 @@ export function validateWebhookPayload(rawBody: string): ValidationResult {
     return { valid: false, error: "Invalid JSON", field: "body" };
   }
 
-  if (!isPlainObject(parsed)) {
-    return { valid: false, error: "Payload must be a JSON object", field: "body" };
-  }
-
-  const obj = parsed as Record<string, unknown>;
-
-  if (typeof obj.id !== "string" || obj.id.length === 0) {
+  // Validate Envelope
+  const envelopeResult = EnvelopeSchema.safeParse(parsed);
+  if (!envelopeResult.success) {
+    const error = envelopeResult.error.issues[0];
     return {
       valid: false,
-      error: "Missing or invalid 'id' (must be a non-empty string)",
-      field: "id",
+      error: error.message,
+      field: error.path.join("."),
     };
   }
 
-  if (typeof obj.type !== "string" || obj.type.length === 0) {
-    return {
-      valid: false,
-      error: "Missing or invalid 'type' (must be a non-empty string)",
-      field: "type",
-    };
+  const payload = envelopeResult.data;
+
+  // Validate Event-specific data
+  // Only validate if it's a known supported event
+  if ((SUPPORTED_WEBHOOK_EVENTS as readonly string[]).includes(payload.type)) {
+    const schema = DataSchemas[payload.type as keyof typeof DataSchemas];
+    const dataResult = schema.safeParse(payload.data);
+
+    if (!dataResult.success) {
+      const error = dataResult.error.issues[0];
+      return {
+        valid: false,
+        error: error.message,
+        field: `data.${error.path.join(".")}`,
+      };
+    }
   }
 
-  if (typeof obj.created !== "number" || !Number.isFinite(obj.created) || obj.created <= 0) {
-    return {
-      valid: false,
-      error: "Missing or invalid 'created' (must be a positive number)",
-      field: "created",
-    };
-  }
-
-  const dataError = validateDataFields(obj.type as string, obj.data);
-  if (dataError) {
-    return { valid: false, error: dataError.message, field: dataError.field };
-  }
-
-  if (obj.data === undefined || obj.data === null) {
-    return { valid: false, error: "Missing required field 'data'", field: "data" };
-  }
-
-  return {
-    valid: true,
-    payload: {
-      id: obj.id as string,
-      type: obj.type as string,
-      created: obj.created as number,
-      data: obj.data as Record<string, unknown>,
-    },
-  };
+  return { valid: true, payload };
 }
