@@ -1,4 +1,5 @@
 import type { Member, Pass } from "@/lib/mock-data";
+import { MEMBER_ROLES } from "@/lib/member-roles";
 
 export type FieldValidationError = {
   field: string;
@@ -16,7 +17,6 @@ type MemberUpdateInput = Partial<Omit<Member, "id">>;
 
 const PASS_STATUSES = ["active", "inactive", "draft"] as const;
 const MEMBER_STATUSES = ["active", "inactive", "pending"] as const;
-const MEMBER_ROLES = ["admin", "member", "contributor"] as const;
 const SERVER_OWNED_FIELDS = ["id", "createdAt"] as const;
 const WALLET_ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 

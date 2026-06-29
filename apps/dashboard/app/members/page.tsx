@@ -16,6 +16,7 @@
 
 import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
+import RoleEditor from "@/components/RoleEditor";
 import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { mockMembers, type Member as MockMember } from "@/lib/mock-data";
 import { useSession } from "@/lib/hooks/useSession";
@@ -135,15 +136,11 @@ export default function MembersPage() {
     }
   };
 
-  const handleChangeRole = (id: string) => {
-    const role = prompt("Enter new role (e.g., admin, member, contributor):");
-    if (role) {
-      const member = members.find(m => m.id === id);
-      if (member) {
-        const newRoles = [...new Set([...member.roles, role])];
-        updateMutation.mutate({ id, data: { roles: newRoles } });
-      }
-    }
+  // Roles are edited inline through the RoleEditor (removable chips + a select
+  // of supported roles), which can only ever produce a valid, de-duplicated
+  // list. The API route re-validates server-side before persisting.
+  const handleRolesChange = (id: string, roles: string[]) => {
+    updateMutation.mutate({ id, data: { roles } });
   };
 
   return (
@@ -304,17 +301,11 @@ setMembers((prev) => [safeMember, ...prev]);
                       <StatusBadge status={member.status} />
                     </td>
                     <td className="px-6 py-4 text-slate-600">
-                      {(member.roles ?? []).map((role) => (
-                        <span
-                          key={role}
-                          className="mr-2 px-2 py-1 bg-slate-100 rounded text-xs"
-                        >
-                          {role}
-                        </span>
-                      ))}
-                      {(member.roles ?? []).length === 0 && (
-                        <span className="text-slate-400 text-xs italic">None</span>
-                      )}
+                      <RoleEditor
+                        roles={member.roles ?? []}
+                        disabled={!canWrite || isPending}
+                        onChange={(roles) => handleRolesChange(member.id, roles)}
+                      />
                     </td>
                     <td className="px-6 py-4 text-slate-600">
                       {new Date(member.lastActive).toLocaleDateString()}
@@ -322,16 +313,6 @@ setMembers((prev) => [safeMember, ...prev]);
                     {canWrite && (
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <button
-                            id={`btn-change-role-member-${member.id}`}
-                            onClick={() => handleChangeRole(member.id)}
-                            disabled={isPending}
-                            className="text-xs text-slate-600 hover:text-violet-600 font-medium transition-colors disabled:opacity-50"
-                            title={`Change role for ${member.name}`}
-                          >
-                            Change Role
-                          </button>
-                          <span className="text-slate-300">·</span>
                           <button
                             id={`btn-remove-member-${member.id}`}
                             onClick={() => handleRemove(member.id)}
