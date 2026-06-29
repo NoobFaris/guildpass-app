@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleApiError, apiError } from "@/lib/api-helpers";
+import { NotFoundError } from "@/lib/api-errors";
 import { mockPasses, type Pass } from "@/lib/mock-data";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
@@ -132,7 +133,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   return handleApiError(async () => {
     const passRepository = getPassRepository();
     const success = await passRepository.delete(id);
-    if (!success) throw new Error("Pass not found or deletion failed");
+    if (!success) throw new NotFoundError("Pass not found.");
     return { success: true };
   });
 }

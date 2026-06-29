@@ -9,10 +9,13 @@ import type {
   IGuildRepository,
   IMemberRepository,
   IActivityRepository,
+  ISettingsRepository,
 } from "../types";
 import type { Pass, Guild, Member } from "../../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
+import type { DashboardSettings } from "../../settings";
 import { mockPasses, mockGuilds, mockMembers } from "../../mock-data";
+import { DEFAULT_SETTINGS } from "../../settings";
 
 /**
  * Mock pass repository: in-memory storage.
@@ -206,5 +209,23 @@ export class MockActivityRepository implements IActivityRepository {
     if (this.processedIds.has(eventId)) return false;
     this.processedIds.add(eventId);
     return true;
+  }
+}
+
+/**
+ * Mock settings repository: a single in-memory settings document, seeded from
+ * DEFAULT_SETTINGS. Updates merge and persist for the lifetime of the process,
+ * so a read after an update reflects the saved values.
+ */
+export class MockSettingsRepository implements ISettingsRepository {
+  private settings: DashboardSettings = { ...DEFAULT_SETTINGS };
+
+  async get(): Promise<DashboardSettings> {
+    return { ...this.settings };
+  }
+
+  async update(patch: Partial<DashboardSettings>): Promise<DashboardSettings> {
+    this.settings = { ...this.settings, ...patch };
+    return { ...this.settings };
   }
 }

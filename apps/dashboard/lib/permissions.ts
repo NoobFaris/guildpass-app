@@ -54,6 +54,8 @@ export const canEditSettings = (session: Session): boolean =>
 export class PermissionDeniedError extends Error {
   readonly permission: Permission;
   readonly statusCode = 403;
+  /** Marks this as a client-safe error so handleApiError exposes its message. */
+  readonly expose = true as const;
 
   constructor(permission: Permission) {
     super(`Permission denied: "${permission}" is required for this action.`);
