@@ -3,9 +3,9 @@
  * This is the single point of configuration for all data persistence.
  */
 
-import type { IRepositoryFactory, IPassRepository, IGuildRepository, IMemberRepository, IActivityRepository } from "./types";
-import { MockPassRepository, MockGuildRepository, MockMemberRepository, MockActivityRepository } from "./adapters/mock";
-import { DurablePassRepository, DurableGuildRepository, DurableMemberRepository, DurableActivityRepository } from "./adapters/durable";
+import type { IRepositoryFactory, IPassRepository, IGuildRepository, IMemberRepository, IActivityRepository, ISettingsRepository } from "./types";
+import { MockPassRepository, MockGuildRepository, MockMemberRepository, MockActivityRepository, MockSettingsRepository } from "./adapters/mock";
+import { DurablePassRepository, DurableGuildRepository, DurableMemberRepository, DurableActivityRepository, DurableSettingsRepository } from "./adapters/durable";
 import { getStorageMode, getStorageConfig } from "../env";
 
 /**
@@ -15,6 +15,7 @@ let mockPassRepo: IPassRepository | null = null;
 let mockGuildRepo: IGuildRepository | null = null;
 let mockMemberRepo: IMemberRepository | null = null;
 let mockActivityRepo: IActivityRepository | null = null;
+let mockSettingsRepo: ISettingsRepository | null = null;
 
 /**
  * Singleton instances for durable repositories (reused per process).
@@ -23,6 +24,7 @@ let durablePassRepo: IPassRepository | null = null;
 let durableGuildRepo: IGuildRepository | null = null;
 let durableMemberRepo: IMemberRepository | null = null;
 let durableActivityRepo: IActivityRepository | null = null;
+let durableSettingsRepo: ISettingsRepository | null = null;
 
 /**
  * Creates or returns a cached repository factory based on storage mode.
@@ -48,6 +50,10 @@ export function getRepositoryFactory(): IRepositoryFactory {
         if (!mockActivityRepo) mockActivityRepo = new MockActivityRepository();
         return mockActivityRepo;
       },
+      settingsRepository() {
+        if (!mockSettingsRepo) mockSettingsRepo = new MockSettingsRepository();
+        return mockSettingsRepo;
+      },
     };
   }
 
@@ -71,6 +77,10 @@ export function getRepositoryFactory(): IRepositoryFactory {
       activityRepository() {
         if (!durableActivityRepo) durableActivityRepo = new DurableActivityRepository(connectionString);
         return durableActivityRepo;
+      },
+      settingsRepository() {
+        if (!durableSettingsRepo) durableSettingsRepo = new DurableSettingsRepository(connectionString);
+        return durableSettingsRepo;
       },
     };
   }
@@ -97,6 +107,10 @@ export function getActivityRepository(): IActivityRepository {
   return getRepositoryFactory().activityRepository();
 }
 
+export function getSettingsRepository(): ISettingsRepository {
+  return getRepositoryFactory().settingsRepository();
+}
+
 /**
  * Clear cached repositories (useful for testing).
  */
@@ -105,8 +119,10 @@ export function clearRepositories(): void {
   mockGuildRepo = null;
   mockMemberRepo = null;
   mockActivityRepo = null;
+  mockSettingsRepo = null;
   durablePassRepo = null;
   durableGuildRepo = null;
   durableMemberRepo = null;
   durableActivityRepo = null;
+  durableSettingsRepo = null;
 }
