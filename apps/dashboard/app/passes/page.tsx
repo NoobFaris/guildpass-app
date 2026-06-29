@@ -30,6 +30,15 @@ export default function PassesPage() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const previousPassesRef = useRef<MockPass[]>(passes);
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [form, setForm] = useState({
+       name: "",
+      description: "",
+      price: "",
+      maxSupply: "",
+           });
+
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -105,6 +114,8 @@ export default function PassesPage() {
     }
   };
 
+  
+
   return (
     <DashboardLayout title="Passes" session={session}>
       {/* ── Page header ─────────────────────────────────────────────────── */}
@@ -115,14 +126,115 @@ export default function PassesPage() {
 
         {/* Create button — write roles only */}
         {canWrite && (
-          <button
-            id="btn-create-pass"
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
+         <button
+          id="btn-create-pass"
+          onClick={() => setIsCreateOpen(true)}
+          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
             <span>＋</span> Create Pass
           </button>
         )}
       </div>
+
+      {isCreateOpen && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-xl w-[400px] space-y-3">
+
+      <h2 className="text-lg font-semibold">Create Pass</h2>
+
+      <input
+        placeholder="Name"
+        value={form.name}
+        onChange={(e) => setForm({ ...form, name: e.target.value })}
+        className="w-full border p-2 rounded"
+      />
+
+      <input
+        placeholder="Description"
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        className="w-full border p-2 rounded"
+      />
+
+      <input
+        placeholder="Price"
+        value={form.price}
+        onChange={(e) => setForm({ ...form, price: e.target.value })}
+        className="w-full border p-2 rounded"
+      />
+
+      <input
+        placeholder="Max Supply"
+        value={form.maxSupply}
+        onChange={(e) => setForm({ ...form, maxSupply: e.target.value })}
+        className="w-full border p-2 rounded"
+      />
+
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setIsCreateOpen(false)}>
+          Cancel
+        </button>
+
+        <button
+          disabled={createLoading}
+          onClick={async () => {
+            if (!form.name.trim()) {
+            alert("Pass name is required.");
+            return;
+              }
+
+              if (!form.description.trim()) {
+              alert("Description is required.");
+              return;
+               }
+
+             try {
+              setCreateLoading(true);
+
+           const res = await fetch("/api/passes", {
+             method: "POST",
+             headers: {
+              "Content-Type": "application/json",
+                  },
+          body: JSON.stringify({
+          name: form.name,
+          description: form.description,
+          price: form.price ? Number(form.price) : undefined,
+          maxSupply: form.maxSupply
+          ? Number(form.maxSupply)
+          : undefined,
+      }),
+    });
+
+        if (!res.ok) {
+         const err = await res.json();
+         throw new Error(err.error || "Failed to create pass");
+      }
+
+       const newPass = await res.json();
+
+        setPasses((prev) => [newPass, ...prev]);
+        setIsCreateOpen(false);
+
+       setForm({
+         name: "",
+        description: "",
+        price: "",
+        maxSupply: "",
+         });
+      } catch (e: any) {
+      alert(e.message);
+    } finally {
+    setCreateLoading(false);
+  }
+}}
+        >
+          {createLoading ? "Creating..." : "Create"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* ── Passes table ────────────────────────────────────────────────── */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
