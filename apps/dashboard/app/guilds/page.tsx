@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import { getClientApiMode } from '@/lib/client-env';
 import DashboardLayout from "@/components/DashboardLayout";
 import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { mockGuilds, type Guild as MockGuild } from "@/lib/mock-data";
@@ -120,12 +121,12 @@ export default function GuildsPage() {
 
   return (
     <DashboardLayout title="Guilds" session={session}>
-      {/* ── Unsupported banner (live mode) ──────────────────────────────── */}
+      {/* â”€â”€ Unsupported banner (live mode) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {listState === "unsupported" && (
         <UnsupportedBanner resource="guilds" />
       )}
 
-      {/* ── Error banner (live mode network error) ─────────────────────── */}
+      {/* â”€â”€ Error banner (live mode network error) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {listState === "error" && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 my-4">
           <p className="text-sm text-red-700">
@@ -164,7 +165,7 @@ export default function GuildsPage() {
                   >
                     Rename
                   </button>
-                  <span className="text-slate-300">·</span>
+                  <span className="text-slate-300">Â·</span>
                   <button
                     onClick={() => handleDelete(guild.id)}
                     className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
@@ -181,3 +182,4 @@ export default function GuildsPage() {
     </DashboardLayout>
   );
 }
+
