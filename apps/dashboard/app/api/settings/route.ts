@@ -2,18 +2,36 @@ import { NextResponse } from "next/server";
 import { handleApiError, apiError } from "@/lib/api-helpers";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { getSettingsRepository } from "@/lib/repositories/factory";
+import { validateSettingsPatch } from "@/lib/validation/settings";
 
 /**
- * GET /api/settings is intentionally omitted — settings are rendered server-side
- * from the session; no separate read endpoint is needed for this page.
+ * GET /api/settings
+ * Returns the typed workspace settings. Requires settings:read (held by every
+ * role, including readonly), so the page can hydrate its initial values.
  *
  * PATCH /api/settings
- * Requires settings:write permission.
+ * Validates and persists supported settings. Requires settings:write.
  *
  * ⚠️  In production, resolve the session from the request (JWT / cookie)
  *     instead of using MOCK_API_SESSION, then assertPermission against it.
  */
-export async function PATCH(): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
+  try {
+    assertPermission(MOCK_API_SESSION, "settings:read");
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) {
+      return apiError(err.message, 403);
+    }
+    throw err;
+  }
+
+  return handleApiError(async () => {
+    return await getSettingsRepository().get();
+  });
+}
+
+export async function PATCH(request: Request): Promise<NextResponse> {
   try {
     assertPermission(MOCK_API_SESSION, "settings:write");
   } catch (err) {
@@ -23,8 +41,22 @@ export async function PATCH(): Promise<NextResponse> {
     throw err;
   }
 
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON." }, { status: 400 });
+  }
+
+  const result = validateSettingsPatch(body);
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: "Invalid settings", errors: result.errors },
+      { status: 400 }
+    );
+  }
+
   return handleApiError(async () => {
-    // TODO: parse request body and persist settings to the real data store
-    return { message: "Settings updated (stub)" };
+    return await getSettingsRepository().update(result.value);
   });
 }

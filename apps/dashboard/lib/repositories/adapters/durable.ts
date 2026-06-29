@@ -11,9 +11,11 @@ import type {
   IGuildRepository,
   IMemberRepository,
   IActivityRepository,
+  ISettingsRepository,
 } from "../types";
 import type { Pass, Guild, Member } from "../../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
+import type { DashboardSettings } from "../../settings";
 
 /**
  * Base class for durable repositories.
@@ -164,5 +166,22 @@ export class DurableActivityRepository extends DurableRepository implements IAct
 
   async markProcessed(_eventId: string): Promise<boolean> {
     throw new Error("DurableActivityRepository not yet implemented");
+  }
+}
+
+/**
+ * Durable settings repository.
+ *
+ * Backend implementations MUST:
+ * - Persist the single settings document per workspace
+ * - Never store secret values in this public settings model
+ */
+export class DurableSettingsRepository extends DurableRepository implements ISettingsRepository {
+  async get(): Promise<DashboardSettings> {
+    throw new Error("DurableSettingsRepository not yet implemented. Configure STORAGE_BACKEND in .env");
+  }
+
+  async update(_patch: Partial<DashboardSettings>): Promise<DashboardSettings> {
+    throw new Error("DurableSettingsRepository not yet implemented");
   }
 }
