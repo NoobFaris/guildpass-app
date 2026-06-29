@@ -7,6 +7,11 @@ import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
 import { IntegrationClient } from "@guildpass/integration-client";
 import { getEnv, getApiMode } from "@/lib/env";
 import { getMemberRepository } from "@/lib/repositories/factory";
+import {
+  malformedPayloadError,
+  validateMemberCreatePayload,
+  validateMemberUpdatePayload,
+} from "@/lib/validation/mutations";
 
 /**
  * GET /api/members
@@ -103,22 +108,20 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   return handleApiError(async () => {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ errors: malformedPayloadError() }, { status: 400 });
+    }
 
-const memberRepository = getMemberRepository();
+    const validation = validateMemberCreatePayload(body);
+    if (!validation.valid) {
+      return NextResponse.json({ errors: validation.errors }, { status: 400 });
+    }
 
-const newMember = {
-  id: crypto.randomUUID(),
-  name: body.name ?? "Unknown",
-  wallet: body.wallet ?? "",
-  status: body.status ?? "pending",
-  roles: Array.isArray(body.roles) ? body.roles : [],
-  joinedAt: new Date().toISOString(),
-  lastActive: new Date().toISOString(),
-};
-
-return await memberRepository.create(newMember);;
-    return await memberRepository.create(body);
+    const memberRepository = getMemberRepository();
+    return await memberRepository.create(validation.data);
   });
 }
 
@@ -142,10 +145,21 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   if (!id) return apiError("Missing member ID", 400);
 
   return handleApiError(async () => {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ errors: malformedPayloadError() }, { status: 400 });
+    }
+
+    const validation = validateMemberUpdatePayload(body);
+    if (!validation.valid) {
+      return NextResponse.json({ errors: validation.errors }, { status: 400 });
+    }
+
     const memberRepository = getMemberRepository();
-    const updated = await memberRepository.update(id, body);
-    if (!updated) throw new NotFoundError("Member not found.");
+    const updated = await memberRepository.update(id, validation.data);
+    if (!updated) throw new Error("Member not found or update failed");
     return updated;
   });
 }
