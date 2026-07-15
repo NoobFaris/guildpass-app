@@ -6,6 +6,26 @@
 import type { Pass, Guild, Member } from "../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
 import type { DashboardSettings } from "../settings";
+import type { PaginatedResponse } from "../api-contracts";
+
+export interface PaginationOptions {
+  limit?: number;
+  cursor?: string | null;
+  page?: number;
+}
+
+export interface PaginatedResult<T> extends PaginatedResponse<T> {}
+
+export interface PassListQuery extends PaginationOptions {
+  search?: string;
+  status?: Pass["status"] | "all";
+}
+
+export interface MemberListQuery extends PaginationOptions {
+  search?: string;
+  status?: Member["status"] | "all";
+  role?: string | "all";
+}
 
 /**
  * Repository for managing passes.
@@ -15,6 +35,11 @@ export interface IPassRepository {
    * Get all passes.
    */
   getAll(): Promise<Pass[]>;
+
+  /**
+   * Query passes with filtering and bounded pagination.
+   */
+  query(options?: PassListQuery): Promise<PaginatedResult<Pass>>;
 
   /**
    * Get a pass by ID.
@@ -75,6 +100,11 @@ export interface IMemberRepository {
    * Get all members.
    */
   getAll(): Promise<Member[]>;
+
+  /**
+   * Query members with filtering and bounded pagination.
+   */
+  query(options?: MemberListQuery): Promise<PaginatedResult<Member>>;
 
   /**
    * Get a member by ID.

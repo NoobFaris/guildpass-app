@@ -1,67 +1,103 @@
 "use client";
 
-/**
- * app/members/page.tsx
- *
- * Members management page.
- *
- * Visibility rules:
- *  - Table (read) — visible to ALL roles (members:read).
- *  - "Invite Member" button — visible only when canManageMembers() is true (members:write).
- *  - "Remove" / "Change Role" row actions — same guard.
- *
- * Note: Mutation handlers must enforce permissions server-side via
- * assertPermission. UI hiding is convenience only.
- */
-
 import DashboardLayout from "@/components/DashboardLayout";
-import StatusBadge from "@/components/StatusBadge";
+import EmptyState from "@/components/EmptyState";
 import RoleEditor from "@/components/RoleEditor";
+import StatusBadge from "@/components/StatusBadge";
 import UnsupportedBanner from "@/components/UnsupportedBanner";
-import { mockMembers, type Member as MockMember } from "@/lib/mock-data";
+import { ApiClientError, readApiResult } from "@/lib/api-client";
+import { getClientApiMode } from "@/lib/client-env";
 import { useSession } from "@/lib/hooks/useSession";
-import { canManageMembers } from "@/lib/permissions";
-import { useEffect, useState, useRef } from "react";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
-import { readApiResult } from "@/lib/api-client";
+import { MEMBER_ROLES } from "@/lib/member-roles";
+import { mockMembers, type Member as MockMember } from "@/lib/mock-data";
+import { canManageMembers } from "@/lib/permissions";
+import type { PaginatedResult } from "@/lib/repositories/types";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+type ListState = "loading" | "loaded" | "unsupported" | "error";
+type MemberStatusFilter = MockMember["status"] | "all";
+type MemberRoleFilter = (typeof MEMBER_ROLES)[number] | "all";
+
+const PAGE_SIZE = 10;
+
+const emptyPage: PaginatedResult<MockMember> = {
+  items: [],
+  total: 0,
+  limit: PAGE_SIZE,
+  page: 1,
+  nextCursor: null,
+  hasNextPage: false,
+  hasPreviousPage: false,
+};
 
 export default function MembersPage() {
   const session = useSession();
   const canWrite = canManageMembers(session);
-  const [members, setMembers] = useState<MockMember[]>(mockMembers);
-  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
-  const [listState, setListState] = useState<"loading" | "loaded" | "unsupported" | "error">("loading");
-  const previousMembersRef = useRef<MockMember[]>(members);
   const apiMode = getClientApiMode();
 
-    const [isInviteOpen, setIsInviteOpen] = useState(false);
-    const [inviteLoading, setInviteLoading] = useState(false);
+  const [members, setMembers] = useState<MockMember[]>(mockMembers.slice(0, PAGE_SIZE));
+  const [pagination, setPagination] = useState<PaginatedResult<MockMember>>({
+    ...emptyPage,
+    items: mockMembers.slice(0, PAGE_SIZE),
+    total: mockMembers.length,
+    hasNextPage: mockMembers.length > PAGE_SIZE,
+  });
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [listState, setListState] = useState<ListState>("loading");
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<MemberStatusFilter>("all");
+  const [role, setRole] = useState<MemberRoleFilter>("all");
+  const [page, setPage] = useState(1);
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const previousMembersRef = useRef<MockMember[]>(members);
 
-    const [form, setForm] = useState({
-    name: "",
-    wallet: "",
-});
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [form, setForm] = useState({ name: "", wallet: "" });
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, role, status]);
 
   useEffect(() => {
     let mounted = true;
+
     async function load() {
+      setListState("loading");
       try {
-        const res = await fetch("/api/members");
-        const data = await readApiResult<MockMember[]>(res);
-        if (mounted) {
-          setMembers(data);
-          previousMembersRef.current = data;
-        }
+        const params = new URLSearchParams({
+          limit: String(PAGE_SIZE),
+          page: String(page),
+        });
+        if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+        if (status !== "all") params.set("status", status);
+        if (role !== "all") params.set("role", role);
+
+        const res = await fetch(`/api/members?${params.toString()}`);
+        const data = await readApiResult<PaginatedResult<MockMember>>(res);
+        if (!mounted) return;
+
+        setMembers(data.items);
+        setPagination(data);
+        previousMembersRef.current = data.items;
+        setListState("loaded");
       } catch (err) {
-        // fallback to mockMembers (already the default)
+        if (!mounted) return;
+        if (err instanceof ApiClientError && err.code === "UNSUPPORTED") {
+          setListState("unsupported");
+          return;
+        }
         console.warn("Falling back to mock members:", err);
+        setListState(apiMode === "live" ? "error" : "loaded");
       }
     }
+
     load();
     return () => {
       mounted = false;
     };
-  }, [apiMode]);
+  }, [apiMode, debouncedSearch, page, role, status]);
 
   const updateMutation = useOptimisticMutation<MockMember, { id: string; data: Partial<MockMember> }>({
     mutationFn: async ({ id, data }) => {
@@ -74,9 +110,7 @@ export default function MembersPage() {
     },
     onOptimisticUpdate: ({ id, data }) => {
       previousMembersRef.current = members;
-      setMembers((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, ...data } : m))
-      );
+      setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...data } : m)));
       setPendingIds((prev) => new Set(prev).add(id));
     },
     onRollback: (_error, { id }) => {
@@ -88,9 +122,7 @@ export default function MembersPage() {
       });
     },
     onSuccess: (updatedMember, { id }) => {
-      setMembers((prev) =>
-        prev.map((m) => (m.id === id ? updatedMember : m))
-      );
+      setMembers((prev) => prev.map((m) => (m.id === id ? updatedMember : m)));
       setPendingIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -99,14 +131,12 @@ export default function MembersPage() {
     },
     onError: (error) => {
       alert(error.message);
-    }
+    },
   });
 
   const deleteMutation = useOptimisticMutation<{ success: boolean }, string>({
     mutationFn: async (id) => {
-      const res = await fetch(`/api/members?id=${id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(`/api/members?id=${id}`, { method: "DELETE" });
       return readApiResult<{ success: boolean }>(res);
     },
     onOptimisticUpdate: (id) => {
@@ -116,9 +146,10 @@ export default function MembersPage() {
     },
     onRollback: () => {
       setMembers(previousMembersRef.current);
-      setPendingIds(new Set()); // Reset all pending since we restore full state
+      setPendingIds(new Set());
     },
     onSuccess: (_data, id) => {
+      setPagination((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
       setPendingIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -127,8 +158,15 @@ export default function MembersPage() {
     },
     onError: (error) => {
       alert(error.message);
-    }
+    },
   });
+
+  const resultSummary = useMemo(() => {
+    if (pagination.total === 0) return "No members found";
+    const start = (pagination.page - 1) * pagination.limit + 1;
+    const end = start + members.length - 1;
+    return `Showing ${start}-${end} of ${pagination.total} members`;
+  }, [members.length, pagination]);
 
   const handleRemove = (id: string) => {
     if (confirm("Are you sure you want to remove this member?")) {
@@ -136,203 +174,229 @@ export default function MembersPage() {
     }
   };
 
-  // Roles are edited inline through the RoleEditor (removable chips + a select
-  // of supported roles), which can only ever produce a valid, de-duplicated
-  // list. The API route re-validates server-side before persisting.
   const handleRolesChange = (id: string, roles: string[]) => {
     updateMutation.mutate({ id, data: { roles } });
   };
 
   return (
     <DashboardLayout title="Members" session={session}>
-      {/* ── Unsupported banner (live mode) ──────────────────────────────── */}
-      {listState === "unsupported" && (
-        <UnsupportedBanner resource="members" />
-      )}
+      {listState === "unsupported" && <UnsupportedBanner resource="members" />}
 
-      {/* ── Error banner (live mode network error) ─────────────────────── */}
       {listState === "error" && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 my-4">
+        <div className="my-4 rounded-lg border border-red-200 bg-red-50 p-4">
           <p className="text-sm text-red-700">
             Failed to load members from the server. Check your API configuration and try again.
           </p>
         </div>
       )}
 
-      {/* ── Page header ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-sm text-slate-500">
-          {listState === "unsupported"
-            ? "Member listing unavailable in live mode"
-            : `${members.length} member${members.length !== 1 ? "s" : ""} total`}
+          {listState === "unsupported" ? "Member listing unavailable in live mode" : resultSummary}
         </p>
 
-        {/* Invite button — write roles only */}
         {canWrite && listState !== "unsupported" && (
           <button
-               id="btn-invite-member"
-               onClick={() => setIsInviteOpen(true)}
-               className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-               >
-            <span>＋</span> Invite Member
+            id="btn-invite-member"
+            onClick={() => setIsInviteOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700"
+          >
+            <span>+</span> Invite Member
           </button>
         )}
       </div>
 
-      {isInviteOpen && (
-  <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
-    <div className="bg-white p-6 rounded-xl w-[400px] space-y-3">
-
-      <h2 className="text-lg font-semibold">Invite Member</h2>
-
-      <input
-        placeholder="Name"
-        value={form.name}
-        onChange={(e) =>
-          setForm({ ...form, name: e.target.value })
-        }
-        className="w-full border p-2 rounded"
-      />
-
-      <input
-        placeholder="Wallet"
-        value={form.wallet}
-        onChange={(e) =>
-          setForm({ ...form, wallet: e.target.value })
-        }
-        className="w-full border p-2 rounded"
-      />
-
-      <div className="flex justify-end gap-2">
-        <button onClick={() => setIsInviteOpen(false)}>
-          Cancel
-        </button>
-
-        <button
-  disabled={inviteLoading}
-  onClick={async () => {
-    try {
-      if (!form.name.trim()) {
-        alert("Name is required");
-        return;
-      }
-
-      if (!form.wallet.trim()) {
-        alert("Wallet is required");
-        return;
-      }
-
-      setInviteLoading(true);
-
-      const res = await fetch("/api/members", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: form.name,
-          wallet: form.wallet,
-        }),
-      });
-
-      const newMember = await readApiResult<MockMember>(res);
-
-// Fallback safety (prevents roles/status undefined bugs)
-const safeMember = {
-  ...newMember,
-  roles: newMember.roles ?? [],
-  status: newMember.status ?? "pending",
-};
-
-setMembers((prev) => [safeMember, ...prev]);
-
-      setIsInviteOpen(false);
-
-      setForm({
-        name: "",
-        wallet: "",
-      });
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setInviteLoading(false);
-    }
-  }}
->
-  {inviteLoading ? "Inviting..." : "Invite"}
-</button>
-      </div>
-
-    </div>
-  </div>
-)}
-
-      {/* ── Members table ───────────────────────────────────────────────── */}
       {listState !== "unsupported" && (
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-700">Name</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-700">Wallet</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-700">Status</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-700">Roles</th>
-                <th className="px-6 py-4 text-sm font-semibold text-slate-700">Last Active</th>
-                {/* Actions column only rendered for write-capable roles */}
-                {canWrite && (
-                  <th className="px-6 py-4 text-sm font-semibold text-slate-700">Actions</th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {members.map((member) => {
-                const isPending = pendingIds.has(member.id);
-                return (
-                  <tr key={member.id} className={`hover:bg-slate-50 transition-opacity ${isPending ? "opacity-50 pointer-events-none" : ""}`}>
-                    <td className="px-6 py-4 font-medium text-slate-800">
-                      {member.name}
-                      {isPending && <span className="ml-2 text-xs text-slate-400 animate-pulse">(updating...)</span>}
-                    </td>
-                    <td className="px-6 py-4 font-mono text-sm text-slate-600">
-                      {member.wallet.slice(0, 6)}...{member.wallet.slice(-4)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={member.status} />
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">
-                      <RoleEditor
-                        roles={member.roles ?? []}
-                        disabled={!canWrite || isPending}
-                        onChange={(roles) => handleRolesChange(member.id, roles)}
-                      />
-                    </td>
-                    <td className="px-6 py-4 text-slate-600">
-                      {new Date(member.lastActive).toLocaleDateString()}
-                    </td>
-                    {canWrite && (
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            id={`btn-remove-member-${member.id}`}
-                            onClick={() => handleRemove(member.id)}
-                            disabled={isPending}
-                            className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50"
-                            title={`Remove ${member.name}`}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
+          <label className="block">
+            <span className="sr-only">Search members</span>
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by name or wallet"
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="sr-only">Filter by status</span>
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value as MemberStatusFilter)}
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="pending">Pending</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="sr-only">Filter by role</span>
+            <select
+              value={role}
+              onChange={(event) => setRole(event.target.value as MemberRoleFilter)}
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+            >
+              <option value="all">All roles</option>
+              {MEMBER_ROLES.map((memberRole) => (
+                <option key={memberRole} value={memberRole}>
+                  {memberRole}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
-      </div>
+      )}
+
+      {isInviteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">Invite Member</h2>
+            <div className="space-y-3">
+              <input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full rounded-lg border border-slate-200 p-2" />
+              <input placeholder="Wallet" value={form.wallet} onChange={(e) => setForm({ ...form, wallet: e.target.value })} className="w-full rounded-lg border border-slate-200 p-2" />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setIsInviteOpen(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700">
+                Cancel
+              </button>
+              <button
+                disabled={inviteLoading}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                onClick={async () => {
+                  if (!form.name.trim()) return alert("Name is required");
+                  if (!form.wallet.trim()) return alert("Wallet is required");
+
+                  try {
+                    setInviteLoading(true);
+                    const res = await fetch("/api/members", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name: form.name.trim(), wallet: form.wallet.trim() }),
+                    });
+                    const newMember = await readApiResult<MockMember>(res);
+                    const safeMember = {
+                      ...newMember,
+                      roles: newMember.roles ?? [],
+                      status: newMember.status ?? "pending",
+                    };
+                    setMembers((prev) => [safeMember, ...prev].slice(0, pagination.limit));
+                    setPagination((prev) => ({ ...prev, total: prev.total + 1 }));
+                    setIsInviteOpen(false);
+                    setForm({ name: "", wallet: "" });
+                  } catch (error: any) {
+                    alert(error.message);
+                  } finally {
+                    setInviteLoading(false);
+                  }
+                }}
+              >
+                {inviteLoading ? "Inviting..." : "Invite"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {listState !== "unsupported" && (
+        <>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="border-b border-slate-200 bg-slate-50">
+                  <tr>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-700">Name</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-700">Wallet</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-700">Status</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-700">Roles</th>
+                    <th className="px-6 py-4 text-sm font-semibold text-slate-700">Last Active</th>
+                    {canWrite && <th className="px-6 py-4 text-sm font-semibold text-slate-700">Actions</th>}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {members.map((member) => {
+                    const isPending = pendingIds.has(member.id);
+                    return (
+                      <tr key={member.id} className={`transition-opacity hover:bg-slate-50 ${isPending ? "pointer-events-none opacity-50" : ""}`}>
+                        <td className="px-6 py-4 font-medium text-slate-800">
+                          {member.name}
+                          {isPending && <span className="ml-2 text-xs text-slate-400">(updating...)</span>}
+                        </td>
+                        <td className="px-6 py-4 font-mono text-sm text-slate-600">{member.wallet.slice(0, 6)}...{member.wallet.slice(-4)}</td>
+                        <td className="px-6 py-4"><StatusBadge status={member.status} /></td>
+                        <td className="px-6 py-4 text-slate-600">
+                          <RoleEditor roles={member.roles ?? []} disabled={!canWrite || isPending} onChange={(roles) => handleRolesChange(member.id, roles)} />
+                        </td>
+                        <td className="px-6 py-4 text-slate-600">{new Date(member.lastActive).toLocaleDateString()}</td>
+                        {canWrite && (
+                          <td className="px-6 py-4">
+                            <button id={`btn-remove-member-${member.id}`} onClick={() => handleRemove(member.id)} disabled={isPending} className="text-xs font-medium text-red-500 transition-colors hover:text-red-700 disabled:opacity-50">
+                              Remove
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {members.length === 0 && (
+            <div className="mt-4">
+              <EmptyState title="No members match your filters" description="Adjust the search, status, or role filter to see more members." icon="-" />
+            </div>
+          )}
+
+          <PaginationControls
+            page={pagination.page}
+            hasPreviousPage={pagination.hasPreviousPage}
+            hasNextPage={pagination.hasNextPage}
+            onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+            onNext={() => setPage((current) => current + 1)}
+          />
+        </>
       )}
     </DashboardLayout>
   );
+}
+
+function PaginationControls({
+  page,
+  hasPreviousPage,
+  hasNextPage,
+  onPrevious,
+  onNext,
+}: {
+  page: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="mt-4 flex items-center justify-between">
+      <button onClick={onPrevious} disabled={!hasPreviousPage} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+        Previous
+      </button>
+      <span className="text-sm text-slate-500">Page {page}</span>
+      <button onClick={onNext} disabled={!hasNextPage} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
+        Next
+      </button>
+    </div>
+  );
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debounced;
 }

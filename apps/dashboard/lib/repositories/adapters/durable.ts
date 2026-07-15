@@ -12,6 +12,9 @@ import type {
   IMemberRepository,
   IActivityRepository,
   ISettingsRepository,
+  MemberListQuery,
+  PaginatedResult,
+  PassListQuery,
 } from "../types";
 import type { Pass, Guild, Member } from "../../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
@@ -51,6 +54,11 @@ export class DurablePassRepository extends DurableRepository implements IPassRep
     // Example pseudocode:
     // const result = await db.query("SELECT * FROM passes ORDER BY created_at DESC");
     // return result.rows.map(row => this.mapRowToPass(row));
+    throw new Error("DurablePassRepository not yet implemented. Configure STORAGE_BACKEND in .env");
+  }
+
+  async query(_options: PassListQuery = {}): Promise<PaginatedResult<Pass>> {
+    // Durable backends should push search/filter/pagination into indexed queries.
     throw new Error("DurablePassRepository not yet implemented. Configure STORAGE_BACKEND in .env");
   }
 
@@ -113,6 +121,11 @@ export class DurableGuildRepository extends DurableRepository implements IGuildR
  */
 export class DurableMemberRepository extends DurableRepository implements IMemberRepository {
   async getAll(): Promise<Member[]> {
+    throw new Error("DurableMemberRepository not yet implemented");
+  }
+
+  async query(_options: MemberListQuery = {}): Promise<PaginatedResult<Member>> {
+    // Durable backends should push search/filter/pagination into indexed queries.
     throw new Error("DurableMemberRepository not yet implemented");
   }
 

@@ -15,7 +15,9 @@ describe("dashboard API response contract", () => {
 
       assert.equal(response.status, 200);
       assert.equal(body.ok, true);
-      assert.ok(Array.isArray(body.data));
+      assert.ok(Array.isArray(body.data.items));
+      assert.equal(typeof body.data.total, "number");
+      assert.ok(body.data.nextCursor === null || typeof body.data.nextCursor === "string");
     } finally {
       restoreEnv("DASHBOARD_API_MODE", previousMode);
     }

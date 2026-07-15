@@ -13,12 +13,15 @@ import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
 import { IntegrationClient } from "@guildpass/integration-client";
 import { getEnv, getApiMode } from "@/lib/env";
 import { getMemberRepository } from "@/lib/repositories/factory";
+import { filterMembers, paginateItems, parseListLimit, parseListPage } from "@/lib/pagination";
+import type { MemberListQuery } from "@/lib/repositories/types";
 import {
   malformedPayloadError,
   validateMemberCreatePayload,
   validateMemberUpdatePayload,
 } from "@/lib/validation/mutations";
 import { recordDashboardActivity } from "@/lib/activity/dashboard";
+import { isMemberRole } from "@/lib/member-roles";
 
 export async function GET(request: Request): Promise<NextResponse> {
   return handleApiError(async () => {
@@ -27,6 +30,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const url = new URL(request.url);
     const wallet = url.searchParams.get("wallet");
     const discordUserId = url.searchParams.get("discordUserId");
+    const query = parseMemberListQuery(request);
 
     if (apiMode === "live") {
       const testClient = (globalThis as any).__TEST_INTEGRATION_CLIENT;
@@ -82,12 +86,38 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     try {
       const memberRepository = getMemberRepository();
-      return apiResponse(await memberRepository.getAll());
+      return apiResponse(await memberRepository.query(query));
     } catch (error) {
       console.error("Error fetching members:", error);
-      return apiResponse(mockMembers as Member[]);
+      return apiResponse(getFallbackMembers(query));
     }
   });
+}
+
+const MEMBER_STATUSES: Member["status"][] = ["active", "inactive", "pending"];
+
+function parseMemberListQuery(request: Request): MemberListQuery {
+  const { searchParams } = new URL(request.url);
+  const status = searchParams.get("status");
+  const role = searchParams.get("role");
+
+  return {
+    search: searchParams.get("search") ?? undefined,
+    status: isMemberStatus(status) ? status : "all",
+    role: role && isMemberRole(role) ? role : "all",
+    limit: parseListLimit(searchParams.get("limit")),
+    page: parseListPage(searchParams.get("page")),
+    cursor: searchParams.get("cursor"),
+  };
+}
+
+function isMemberStatus(value: string | null): value is Member["status"] {
+  return value !== null && MEMBER_STATUSES.includes(value as Member["status"]);
+}
+
+function getFallbackMembers(query: MemberListQuery) {
+  const filtered = filterMembers(mockMembers, query);
+  return paginateItems(filtered, query);
 }
 
 export async function POST(request: Request): Promise<NextResponse> {

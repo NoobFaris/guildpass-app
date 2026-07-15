@@ -10,12 +10,16 @@ import type {
   IMemberRepository,
   IActivityRepository,
   ISettingsRepository,
+  MemberListQuery,
+  PaginatedResult,
+  PassListQuery,
 } from "../types";
 import type { Pass, Guild, Member } from "../../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
 import type { DashboardSettings } from "../../settings";
 import { mockPasses, mockGuilds, mockMembers } from "../../mock-data";
 import { DEFAULT_SETTINGS } from "../../settings";
+import { filterMembers, filterPasses, paginateItems } from "@/lib/pagination";
 
 /**
  * Mock pass repository: in-memory storage.
@@ -30,6 +34,11 @@ export class MockPassRepository implements IPassRepository {
 
   async getAll(): Promise<Pass[]> {
     return Array.from(this.passes.values());
+  }
+
+  async query(options: PassListQuery = {}): Promise<PaginatedResult<Pass>> {
+    const filtered = filterPasses(await this.getAll(), options);
+    return paginateItems(filtered, options);
   }
 
   async getById(id: string): Promise<Pass | null> {
@@ -120,6 +129,11 @@ export class MockMemberRepository implements IMemberRepository {
 
   async getAll(): Promise<Member[]> {
     return Array.from(this.members.values());
+  }
+
+  async query(options: MemberListQuery = {}): Promise<PaginatedResult<Member>> {
+    const filtered = filterMembers(await this.getAll(), options);
+    return paginateItems(filtered, options);
   }
 
   async getById(id: string): Promise<Member | null> {

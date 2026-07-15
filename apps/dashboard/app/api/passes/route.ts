@@ -11,6 +11,8 @@ import { requireDashboardSession, UnauthorizedError } from "@/lib/auth/server-se
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
 import { getApiMode } from "@/lib/env";
 import { getPassRepository } from "@/lib/repositories/factory";
+import type { PassListQuery } from "@/lib/repositories/types";
+import { filterPasses, paginateItems, parseListLimit, parseListPage } from "@/lib/pagination";
 import {
   malformedPayloadError,
   validatePassCreatePayload,
@@ -18,9 +20,14 @@ import {
 } from "@/lib/validation/mutations";
 import { recordDashboardActivity } from "@/lib/activity/dashboard";
 
-export async function GET(): Promise<NextResponse> {
+const PASS_STATUSES: Pass["status"][] = ["active", "inactive", "draft"];
+
+export async function GET(
+  request: Request = new Request("http://localhost/api/passes")
+): Promise<NextResponse> {
   return handleApiError(async () => {
     const apiMode = getApiMode();
+    const query = parsePassListQuery(request);
 
     if (apiMode === "live") {
       return apiUnsupported(
@@ -32,12 +39,34 @@ export async function GET(): Promise<NextResponse> {
 
     try {
       const passRepository = getPassRepository();
-      return await passRepository.getAll();
+      return await passRepository.query(query);
     } catch (error) {
       console.error("Error fetching passes:", error);
-      return mockPasses as Pass[];
+      return getFallbackPasses(query);
     }
   });
+}
+
+function parsePassListQuery(request: Request): PassListQuery {
+  const { searchParams } = new URL(request.url);
+  const status = searchParams.get("status");
+
+  return {
+    search: searchParams.get("search") ?? undefined,
+    status: isPassStatus(status) ? status : "all",
+    limit: parseListLimit(searchParams.get("limit")),
+    page: parseListPage(searchParams.get("page")),
+    cursor: searchParams.get("cursor"),
+  };
+}
+
+function isPassStatus(value: string | null): value is Pass["status"] {
+  return value !== null && PASS_STATUSES.includes(value as Pass["status"]);
+}
+
+function getFallbackPasses(query: PassListQuery) {
+  const filtered = filterPasses(mockPasses, query);
+  return paginateItems(filtered, query);
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
