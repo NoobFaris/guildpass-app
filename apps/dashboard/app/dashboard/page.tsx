@@ -7,6 +7,7 @@ import StatusBadge from "@/components/StatusBadge";
 import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { ApiClientError, readApiResult } from "@/lib/api-client";
 import { getClientApiMode } from "@/lib/client-env";
+import { getActivityRefreshConfig } from "@/lib/env";
 import { useActivityFeed } from "@/lib/hooks/useActivityFeed";
 import { mockGuilds, mockMembers, mockPasses, type Member as MockMember } from "@/lib/mock-data";
 import type { PaginatedResult } from "@/lib/repositories/types";
@@ -167,10 +168,4 @@ export default function DashboardPage() {
       </div>
     </DashboardLayout>
   );
-}
-
-function getActivityRefreshConfig() {
-  const raw = process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS;
-  const parsed = raw ? Number(raw) : 0;
-  return { intervalMs: Number.isFinite(parsed) && parsed > 0 ? parsed : 0 };
 }

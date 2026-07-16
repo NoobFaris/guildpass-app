@@ -10,7 +10,7 @@ describe("dashboard API response contract", () => {
 
     try {
       const { GET } = await import("../app/api/passes/route.js");
-      const response = await GET();
+      const response = await GET(new Request("http://localhost/api/passes"));
       const body = await response.json();
 
       assert.equal(response.status, 200);
@@ -65,7 +65,7 @@ describe("dashboard API response contract", () => {
 
     try {
       const { GET } = await import("../app/api/passes/route.js");
-      const response = await GET();
+      const response = await GET(new Request("http://localhost/api/passes"));
       const body = await response.json();
 
       assert.equal(response.status, 501);

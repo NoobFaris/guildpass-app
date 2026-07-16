@@ -1,6 +1,7 @@
 import type { ActivityEvent, ActivityEventType, ActivityEventEntity, ActivityEventSeverity } from "./types";
 import { getActivityRepository } from "@/lib/repositories/factory";
 import type { Session } from "@/lib/auth/session";
+import { publishActivityEvent } from "./stream";
 
 interface DashboardActivityInput {
   type: ActivityEventType;
@@ -46,7 +47,7 @@ function actorFromSession(session?: Session): { id?: string; name?: string; wall
 export async function recordDashboardActivity(
   input: DashboardActivityInput
 ): Promise<ActivityEvent> {
-  return getActivityRepository().append({
+  const event = await getActivityRepository().append({
     type: input.type,
     source: "dashboard",
     severity: input.severity ?? "info",
@@ -54,6 +55,8 @@ export async function recordDashboardActivity(
     description: input.description ?? safeDescription(input.type, input.entity),
     entity: input.entity,
   });
+  publishActivityEvent(event);
+  return event;
 }
 
 export function actorFromRequest(session?: Session): { id?: string; name?: string; wallet?: string } {

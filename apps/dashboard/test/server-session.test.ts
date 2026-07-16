@@ -17,7 +17,7 @@ import {
   requireDashboardSession,
   UnauthorizedError,
 } from "../lib/auth/server-session.ts";
-import { MOCK_API_SESSION, MOCK_API_ROLE } from "../lib/auth/session.ts";
+import { MOCK_API_SESSION } from "../lib/auth/session.ts";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -8,40 +8,12 @@
  *   - Refresh configuration
  */
 
-import { test, describe, beforeEach } from "node:test";
+import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { activityService } from "../lib/data/activity-service";
 import { activityStorage } from "../lib/activity/storage";
 import { getActivityRefreshConfig } from "../lib/env";
 import { makeActivityEvent } from "./fixtures";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Create and persist a unique event via the service, returning it. */
-async function createUniqueEvent(opts: {
-  type?: any;
-  description?: string;
-  timestampOffsetMs?: number;
-} = {}): Promise<any> {
-  const event = await activityService.createEvent({
-    type: opts.type ?? "guild.updated",
-    source: "webhook",
-    severity: "info",
-    actor: { name: "TestActor" },
-    description: opts.description ?? `Refresh test event @ ${Date.now()}`,
-  });
-
-  // Optionally backdate the timestamp for getEventsSince tests
-  if (opts.timestampOffsetMs !== undefined) {
-    const adjusted = new Date(Date.now() + opts.timestampOffsetMs).toISOString();
-    // We can't easily mutate the stored event timestamp since it's pre-stamped,
-    // so we create two events with known timestamps instead.
-  }
-
-  return event;
-}
 
 // ---------------------------------------------------------------------------
 // getEventsSince – incremental polling
@@ -239,15 +211,14 @@ describe("ActivityRefreshConfig", () => {
   });
 
   test("intervalMs can be disabled (0) by env override", () => {
-    // We validate that the config shape supports 0 (disabled).
-    // In a real test env you would set NEXT_PUBLIC_ACTIVITY_REFRESH_MS=0.
-    const config = getActivityRefreshConfig();
-    // If the env var is explicitly set to "0", intervalMs should be 0.
-    // Since we can't mutate process.env reliably in these tests,
-    // we assert the config structure is correct.
-    assert.ok(
-      config.intervalMs === 0 || config.intervalMs > 0,
-      "intervalMs should be either 0 (disabled) or positive"
-    );
+    const previous = process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS;
+    process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS = "0";
+
+    try {
+      assert.equal(getActivityRefreshConfig().intervalMs, 0);
+    } finally {
+      if (previous === undefined) delete process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS;
+      else process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS = previous;
+    }
   });
 });

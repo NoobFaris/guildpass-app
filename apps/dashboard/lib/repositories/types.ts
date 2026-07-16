@@ -14,7 +14,7 @@ export interface PaginationOptions {
   page?: number;
 }
 
-export interface PaginatedResult<T> extends PaginatedResponse<T> {}
+export type PaginatedResult<T> = PaginatedResponse<T>;
 
 export interface PassListQuery extends PaginationOptions {
   search?: string;

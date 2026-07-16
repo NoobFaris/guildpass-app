@@ -23,7 +23,7 @@ import { recordDashboardActivity } from "@/lib/activity/dashboard";
 const PASS_STATUSES: Pass["status"][] = ["active", "inactive", "draft"];
 
 export async function GET(
-  request: Request = new Request("http://localhost/api/passes")
+  request: Request
 ): Promise<NextResponse> {
   return handleApiError(async () => {
     const apiMode = getApiMode();

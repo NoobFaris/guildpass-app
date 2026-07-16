@@ -47,6 +47,23 @@ class ActivityService {
   }
 
   /**
+   * Return activity events strictly newer than the supplied timestamp.
+   */
+  async getEventsSince(
+    timestamp: string,
+    options: Omit<ActivityQuery, "from" | "cursor"> = {}
+  ): Promise<ActivityEvent[]> {
+    const cutoff = new Date(timestamp).getTime();
+    if (Number.isNaN(cutoff)) return [];
+
+    const result = await this.queryEvents({
+      ...options,
+      from: new Date(cutoff + 1).toISOString(),
+    });
+    return result.events;
+  }
+
+  /**
    * Check whether a given event ID has already been recorded (dedup guard).
    */
   async hasProcessedEvent(eventId: string): Promise<boolean> {

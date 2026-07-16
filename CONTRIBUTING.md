@@ -100,7 +100,7 @@ The dashboard uses the following environment variables (set in `apps/dashboard/.
 | `GUILD_PASS_CORE_URL` | — | Base URL of the GuildPass core API (required in `live` mode) |
 | `GUILD_PASS_CORE_API_KEY` | — | API key for the core API (required in `live` mode, server-side only) |
 | `WEBHOOK_SECRET` | — | Secret for verifying incoming webhook signatures |
-| `NEXT_PUBLIC_ACTIVITY_REFRESH_MS` | `15000` | Activity feed polling interval in milliseconds |
+| `NEXT_PUBLIC_ACTIVITY_REFRESH_MS` | `15000` | Activity polling fallback interval; `0` disables automatic SSE and polling |
 | `ACTIVITY_STORAGE_MODE` | `memory` | `memory` (in-memory) or `file` (persist across restarts) |
 | `ACTIVITY_STORAGE_DIR` | `.guildpass-activity` | Directory for file-based activity storage |
 | `DATABASE_URL` | — | PostgreSQL connection string (required when `DASHBOARD_STORAGE_MODE=durable`) |

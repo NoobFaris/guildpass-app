@@ -48,6 +48,10 @@ export const canManageMembers = (session: Session): boolean =>
 export const canManageGuilds = (session: Session): boolean =>
   hasPermission(session, "guilds:write");
 
+/** Can the user view dashboard activity? */
+export const canViewActivity = (session: Session): boolean =>
+  hasPermission(session, "activity:read");
+
 /** Can the user save changes on the Settings page? */
 export const canEditSettings = (session: Session): boolean =>
   hasPermission(session, "settings:write");

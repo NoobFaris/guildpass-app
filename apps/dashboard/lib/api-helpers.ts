@@ -10,6 +10,11 @@ import type {
 } from "./api-contracts";
 import { isPublicApiError, ValidationError } from "@/lib/api-errors";
 
+export type UnsupportedResponse = {
+  error: string;
+  code: "UNSUPPORTED_IN_LIVE_MODE";
+};
+
 export function apiResponse<T>(
   data: T,
   init?: ResponseInit
