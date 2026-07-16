@@ -22,6 +22,7 @@ Thank you for your interest in contributing to the **GuildPass** monorepo! This 
   - [`packages/webhook-utils`](#packageswebhook-utils)
 - [Scripts Reference](#scripts-reference)
 - [Branching & Commits](#branching--commits)
+- [Worked Example](#worked-example)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 - [PR Quality Expectations](#pr-quality-expectations)
 - [Review Process](#review-process)
@@ -232,6 +233,74 @@ All commands are run from the repository root:
   - `chore: upgrade dependencies`
   - `test: add activity API route tests`
 - Keep commits focused — one logical change per commit.
+
+---
+
+## Worked Example
+
+This example shows a small documentation or test contribution from issue selection through PR submission. Replace the issue number, branch name, and package filter with the specific work you are assigned.
+
+1. Pick an issue and create a focused branch:
+
+   ```bash
+   # After a maintainer assigns you a good first issue
+   git checkout main
+   git pull upstream main
+   git checkout -b docs/fix-dashboard-setup-typo
+   ```
+
+2. Install dependencies and make the smallest useful change:
+
+   ```bash
+   pnpm install
+   # Example change: fix one typo in CONTRIBUTING.md or README.md
+   # Keep the diff limited to the issue scope.
+   ```
+
+3. Run the relevant package check first, then the repository type check:
+
+   ```bash
+   # For a dashboard change
+   pnpm --filter @guildpass/dashboard test
+
+   # For a webhook utility change
+   pnpm --filter @guildpass/webhook-utils test
+
+   # Required before opening a PR
+   pnpm typecheck
+   ```
+
+   If your change only touches documentation, explain that no package-specific test was needed and still run the checks that apply to your change.
+
+4. Commit with the existing conventional commit style:
+
+   ```bash
+   git add CONTRIBUTING.md
+   git commit -m "docs: add contributor worked example"
+   ```
+
+5. Open a PR with a concise title and a description that links the issue and includes test evidence:
+
+   ```markdown
+   Title: docs: add contributor worked example
+
+   ## Description
+   Adds a worked contribution walkthrough to CONTRIBUTING.md so first-time contributors can see the expected branch, change, check, and PR-description flow.
+
+   ## Linked Issue
+   Closes #132
+
+   ## Type of Change
+   - [x] Documentation update
+
+   ## Changes Made
+   - Added a worked example covering a minimal scoped change
+   - Included copy-pasteable pnpm commands for package tests and type checking
+
+   ## Test Evidence
+   - pnpm --filter @guildpass/dashboard test
+   - pnpm typecheck
+   ```
 
 ---
 
