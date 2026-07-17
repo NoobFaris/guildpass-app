@@ -27,8 +27,10 @@ test("GET /api/members uses injected IntegrationClient in live mode via mock cli
     const { GET } = await import("../app/api/members/route.js");
     const req = new Request("http://localhost/api/members?wallet=0xabc123");
     const res = await GET(req);
-    const data = await res.json();
+    const body = await res.json();
 
+    assert.strictEqual(body.ok, true);
+    const data = body.data;
     assert.ok(Array.isArray(data));
     assert.strictEqual(data.length, 1);
     assert.strictEqual(data[0].wallet, "0xabc123");

@@ -1,27 +1,30 @@
 "use client";
 
 import DashboardLayout from "@/components/DashboardLayout";
+import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { mockGuilds, type Guild as MockGuild } from "@/lib/mock-data";
 import { useEffect, useState, useRef } from "react";
 import { useSession } from "@/lib/hooks/useSession";
 import { canManageGuilds } from "@/lib/permissions";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
+import { readApiResult } from "@/lib/api-client";
 
 export default function GuildsPage() {
   const session = useSession();
   const canWrite = canManageGuilds(session);
   const [guilds, setGuilds] = useState<MockGuild[]>(mockGuilds);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [listState, setListState] = useState<"loading" | "loaded" | "unsupported" | "error">("loading");
   const previousGuildsRef = useRef<MockGuild[]>(guilds);
+  const apiMode = getClientApiMode();
 
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
         const res = await fetch("/api/guilds");
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        if (mounted && Array.isArray(data)) {
+        const data = await readApiResult<MockGuild[]>(res);
+        if (mounted) {
           setGuilds(data);
           previousGuildsRef.current = data;
         }
@@ -33,7 +36,7 @@ export default function GuildsPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [apiMode]);
 
   const updateMutation = useOptimisticMutation<MockGuild, { id: string; data: Partial<MockGuild> }>({
     mutationFn: async ({ id, data }) => {
@@ -42,11 +45,7 @@ export default function GuildsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to update guild");
-      }
-      return res.json();
+      return readApiResult<MockGuild>(res);
     },
     onOptimisticUpdate: ({ id, data }) => {
       previousGuildsRef.current = guilds;
@@ -83,11 +82,7 @@ export default function GuildsPage() {
       const res = await fetch(`/api/guilds?id=${id}`, {
         method: "DELETE",
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to delete guild");
-      }
-      return res.json();
+      return readApiResult<{ success: boolean }>(res);
     },
     onOptimisticUpdate: (id) => {
       previousGuildsRef.current = guilds;
@@ -125,6 +120,21 @@ export default function GuildsPage() {
 
   return (
     <DashboardLayout title="Guilds" session={session}>
+      {/* ── Unsupported banner (live mode) ──────────────────────────────── */}
+      {listState === "unsupported" && (
+        <UnsupportedBanner resource="guilds" />
+      )}
+
+      {/* ── Error banner (live mode network error) ─────────────────────── */}
+      {listState === "error" && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 my-4">
+          <p className="text-sm text-red-700">
+            Failed to load guilds from the server. Check your API configuration and try again.
+          </p>
+        </div>
+      )}
+
+      {listState !== "unsupported" && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {guilds.map((guild) => {
           const isPending = pendingIds.has(guild.id);
@@ -167,6 +177,7 @@ export default function GuildsPage() {
           );
         })}
       </div>
+      )}
     </DashboardLayout>
   );
 }

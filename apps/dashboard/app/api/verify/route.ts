@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handleApiError, apiResponse } from "@/lib/api-helpers";
+import {
+  apiResponse,
+  apiValidationError,
+  handleApiError,
+} from "@/lib/api-helpers";
 import { getEnv, getApiMode } from "@/lib/env";
 import { IntegrationClient, type VerificationResult } from "@guildpass/integration-client";
 
@@ -10,10 +14,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { discordUserId, wallet } = body;
 
     if (!discordUserId || !wallet) {
-      return NextResponse.json(
-        { error: "Missing discordUserId or wallet" },
-        { status: 400 }
-      );
+      return apiValidationError("Missing verification fields", [
+        ...(!discordUserId
+          ? [{ field: "discordUserId", message: "discordUserId is required" }]
+          : []),
+        ...(!wallet ? [{ field: "wallet", message: "wallet is required" }] : []),
+      ]);
     }
 
     if (mode === "live") {

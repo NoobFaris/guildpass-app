@@ -16,27 +16,38 @@
 
 import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
+import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { mockMembers, type Member as MockMember } from "@/lib/mock-data";
 import { useSession } from "@/lib/hooks/useSession";
 import { canManageMembers } from "@/lib/permissions";
 import { useEffect, useState, useRef } from "react";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
+import { readApiResult } from "@/lib/api-client";
 
 export default function MembersPage() {
   const session = useSession();
   const canWrite = canManageMembers(session);
   const [members, setMembers] = useState<MockMember[]>(mockMembers);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [listState, setListState] = useState<"loading" | "loaded" | "unsupported" | "error">("loading");
   const previousMembersRef = useRef<MockMember[]>(members);
+  const apiMode = getClientApiMode();
+
+    const [isInviteOpen, setIsInviteOpen] = useState(false);
+    const [inviteLoading, setInviteLoading] = useState(false);
+
+    const [form, setForm] = useState({
+    name: "",
+    wallet: "",
+});
 
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
         const res = await fetch("/api/members");
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        if (mounted && Array.isArray(data)) {
+        const data = await readApiResult<MockMember[]>(res);
+        if (mounted) {
           setMembers(data);
           previousMembersRef.current = data;
         }
@@ -49,7 +60,7 @@ export default function MembersPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [apiMode]);
 
   const updateMutation = useOptimisticMutation<MockMember, { id: string; data: Partial<MockMember> }>({
     mutationFn: async ({ id, data }) => {
@@ -58,11 +69,7 @@ export default function MembersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to update member");
-      }
-      return res.json();
+      return readApiResult<MockMember>(res);
     },
     onOptimisticUpdate: ({ id, data }) => {
       previousMembersRef.current = members;
@@ -99,11 +106,7 @@ export default function MembersPage() {
       const res = await fetch(`/api/members?id=${id}`, {
         method: "DELETE",
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to remove member");
-      }
-      return res.json();
+      return readApiResult<{ success: boolean }>(res);
     },
     onOptimisticUpdate: (id) => {
       previousMembersRef.current = members;
@@ -145,24 +148,130 @@ export default function MembersPage() {
 
   return (
     <DashboardLayout title="Members" session={session}>
+      {/* ── Unsupported banner (live mode) ──────────────────────────────── */}
+      {listState === "unsupported" && (
+        <UnsupportedBanner resource="members" />
+      )}
+
+      {/* ── Error banner (live mode network error) ─────────────────────── */}
+      {listState === "error" && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 my-4">
+          <p className="text-sm text-red-700">
+            Failed to load members from the server. Check your API configuration and try again.
+          </p>
+        </div>
+      )}
+
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-slate-500">
-          {members.length} member{members.length !== 1 ? "s" : ""} total
+          {listState === "unsupported"
+            ? "Member listing unavailable in live mode"
+            : `${members.length} member${members.length !== 1 ? "s" : ""} total`}
         </p>
 
         {/* Invite button — write roles only */}
-        {canWrite && (
+        {canWrite && listState !== "unsupported" && (
           <button
-            id="btn-invite-member"
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
+               id="btn-invite-member"
+               onClick={() => setIsInviteOpen(true)}
+               className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+               >
             <span>＋</span> Invite Member
           </button>
         )}
       </div>
 
+      {isInviteOpen && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-xl w-[400px] space-y-3">
+
+      <h2 className="text-lg font-semibold">Invite Member</h2>
+
+      <input
+        placeholder="Name"
+        value={form.name}
+        onChange={(e) =>
+          setForm({ ...form, name: e.target.value })
+        }
+        className="w-full border p-2 rounded"
+      />
+
+      <input
+        placeholder="Wallet"
+        value={form.wallet}
+        onChange={(e) =>
+          setForm({ ...form, wallet: e.target.value })
+        }
+        className="w-full border p-2 rounded"
+      />
+
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setIsInviteOpen(false)}>
+          Cancel
+        </button>
+
+        <button
+  disabled={inviteLoading}
+  onClick={async () => {
+    try {
+      if (!form.name.trim()) {
+        alert("Name is required");
+        return;
+      }
+
+      if (!form.wallet.trim()) {
+        alert("Wallet is required");
+        return;
+      }
+
+      setInviteLoading(true);
+
+      const res = await fetch("/api/members", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: form.name,
+          wallet: form.wallet,
+        }),
+      });
+
+      const newMember = await readApiResult<MockMember>(res);
+
+// Fallback safety (prevents roles/status undefined bugs)
+const safeMember = {
+  ...newMember,
+  roles: newMember.roles ?? [],
+  status: newMember.status ?? "pending",
+};
+
+setMembers((prev) => [safeMember, ...prev]);
+
+      setIsInviteOpen(false);
+
+      setForm({
+        name: "",
+        wallet: "",
+      });
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setInviteLoading(false);
+    }
+  }}
+>
+  {inviteLoading ? "Inviting..." : "Invite"}
+</button>
+      </div>
+
+    </div>
+  </div>
+)}
+
       {/* ── Members table ───────────────────────────────────────────────── */}
+      {listState !== "unsupported" && (
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -195,7 +304,7 @@ export default function MembersPage() {
                       <StatusBadge status={member.status} />
                     </td>
                     <td className="px-6 py-4 text-slate-600">
-                      {member.roles.map((role) => (
+                      {(member.roles ?? []).map((role) => (
                         <span
                           key={role}
                           className="mr-2 px-2 py-1 bg-slate-100 rounded text-xs"
@@ -203,7 +312,7 @@ export default function MembersPage() {
                           {role}
                         </span>
                       ))}
-                      {member.roles.length === 0 && (
+                      {(member.roles ?? []).length === 0 && (
                         <span className="text-slate-400 text-xs italic">None</span>
                       )}
                     </td>
@@ -242,6 +351,7 @@ export default function MembersPage() {
           </table>
         </div>
       </div>
+      )}
     </DashboardLayout>
   );
 }

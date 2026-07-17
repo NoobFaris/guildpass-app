@@ -17,27 +17,39 @@
 
 import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
+import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { mockPasses, type Pass as MockPass } from "@/lib/mock-data";
 import { useSession } from "@/lib/hooks/useSession";
 import { canManagePasses } from "@/lib/permissions";
 import { useEffect, useState, useRef } from "react";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
+import { readApiResult } from "@/lib/api-client";
 
 export default function PassesPage() {
   const session = useSession();
   const canWrite = canManagePasses(session);
   const [passes, setPasses] = useState<MockPass[]>(mockPasses);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [listState, setListState] = useState<"loading" | "loaded" | "unsupported" | "error">("loading");
   const previousPassesRef = useRef<MockPass[]>(passes);
+  const apiMode = getClientApiMode();
+
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [form, setForm] = useState({
+       name: "",
+      description: "",
+      price: "",
+      maxSupply: "",
+           });
 
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
         const res = await fetch("/api/passes");
-        if (!res.ok) throw new Error("fetch failed");
-        const data = await res.json();
-        if (mounted && Array.isArray(data)) {
+        const data = await readApiResult<MockPass[]>(res);
+        if (mounted) {
           setPasses(data);
           previousPassesRef.current = data;
         }
@@ -49,7 +61,7 @@ export default function PassesPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [apiMode]);
 
   const updateMutation = useOptimisticMutation<MockPass, { id: string; data: Partial<MockPass> }>({
     mutationFn: async ({ id, data }) => {
@@ -58,11 +70,7 @@ export default function PassesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to update pass");
-      }
-      return res.json();
+      return readApiResult<MockPass>(res);
     },
     onOptimisticUpdate: ({ id, data }) => {
       previousPassesRef.current = passes;
@@ -105,26 +113,141 @@ export default function PassesPage() {
     }
   };
 
+  
+
   return (
     <DashboardLayout title="Passes" session={session}>
+      {/* ── Unsupported banner (live mode) ──────────────────────────────── */}
+      {listState === "unsupported" && (
+        <UnsupportedBanner resource="passes" />
+      )}
+
+      {/* ── Error banner (live mode network error) ─────────────────────── */}
+      {listState === "error" && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 my-4">
+          <p className="text-sm text-red-700">
+            Failed to load passes from the server. Check your API configuration and try again.
+          </p>
+        </div>
+      )}
+
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-slate-500">
-          {passes.length} pass{passes.length !== 1 ? "es" : ""} total
+          {listState === "unsupported"
+            ? "Pass listing unavailable in live mode"
+            : `${passes.length} pass${passes.length !== 1 ? "es" : ""} total`}
         </p>
 
         {/* Create button — write roles only */}
         {canWrite && (
-          <button
-            id="btn-create-pass"
-            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
+         <button
+          id="btn-create-pass"
+          onClick={() => setIsCreateOpen(true)}
+          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                >
             <span>＋</span> Create Pass
           </button>
         )}
       </div>
 
+      {isCreateOpen && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+    <div className="bg-white p-6 rounded-xl w-[400px] space-y-3">
+
+      <h2 className="text-lg font-semibold">Create Pass</h2>
+
+      <input
+        placeholder="Name"
+        value={form.name}
+        onChange={(e) => setForm({ ...form, name: e.target.value })}
+        className="w-full border p-2 rounded"
+      />
+
+      <input
+        placeholder="Description"
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        className="w-full border p-2 rounded"
+      />
+
+      <input
+        placeholder="Price"
+        value={form.price}
+        onChange={(e) => setForm({ ...form, price: e.target.value })}
+        className="w-full border p-2 rounded"
+      />
+
+      <input
+        placeholder="Max Supply"
+        value={form.maxSupply}
+        onChange={(e) => setForm({ ...form, maxSupply: e.target.value })}
+        className="w-full border p-2 rounded"
+      />
+
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setIsCreateOpen(false)}>
+          Cancel
+        </button>
+
+        <button
+          disabled={createLoading}
+          onClick={async () => {
+            if (!form.name.trim()) {
+            alert("Pass name is required.");
+            return;
+              }
+
+              if (!form.description.trim()) {
+              alert("Description is required.");
+              return;
+               }
+
+             try {
+              setCreateLoading(true);
+
+           const res = await fetch("/api/passes", {
+             method: "POST",
+             headers: {
+              "Content-Type": "application/json",
+                  },
+          body: JSON.stringify({
+          name: form.name,
+          description: form.description,
+          price: form.price ? Number(form.price) : undefined,
+          maxSupply: form.maxSupply
+          ? Number(form.maxSupply)
+          : undefined,
+      }),
+    });
+
+       const newPass = await readApiResult<MockPass>(res);
+
+        setPasses((prev) => [newPass, ...prev]);
+        setIsCreateOpen(false);
+
+       setForm({
+         name: "",
+        description: "",
+        price: "",
+        maxSupply: "",
+         });
+      } catch (e: any) {
+      alert(e.message);
+    } finally {
+    setCreateLoading(false);
+  }
+}}
+        >
+          {createLoading ? "Creating..." : "Create"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
       {/* ── Passes table ────────────────────────────────────────────────── */}
+      {listState !== "unsupported" && (
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -192,6 +315,7 @@ export default function PassesPage() {
           </table>
         </div>
       </div>
+      )}
     </DashboardLayout>
   );
 }

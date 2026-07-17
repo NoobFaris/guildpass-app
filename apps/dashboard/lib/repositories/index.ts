@@ -9,6 +9,7 @@ export {
   getGuildRepository,
   getMemberRepository,
   getActivityRepository,
+  getSettingsRepository,
   clearRepositories,
 } from "./factory";
 
@@ -18,13 +19,15 @@ export type {
   IGuildRepository,
   IMemberRepository,
   IActivityRepository,
+  ISettingsRepository,
 } from "./types";
 
-export { MockPassRepository, MockGuildRepository, MockMemberRepository, MockActivityRepository } from "./adapters/mock";
+export { MockPassRepository, MockGuildRepository, MockMemberRepository, MockActivityRepository, MockSettingsRepository } from "./adapters/mock";
 
 export {
   DurablePassRepository,
   DurableGuildRepository,
   DurableMemberRepository,
   DurableActivityRepository,
+  DurableSettingsRepository,
 } from "./adapters/durable";

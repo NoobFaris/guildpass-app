@@ -37,13 +37,14 @@ All storage access is **server-side only** — repositories are never exposed to
 ### Using a Repository
 
 ```typescript
+import { apiResponse } from "@/lib/api-helpers";
 import { getPassRepository } from "@/lib/repositories";
 
 // In an API route or server component:
 export async function GET() {
   const passRepository = getPassRepository();
   const passes = await passRepository.getAll();
-  return NextResponse.json(passes);
+  return apiResponse(passes);
 }
 ```
 

@@ -11,10 +11,11 @@ test("GET /api/members returns mock members in mock mode", async () => {
 
     const req = new Request("http://localhost/api/members");
     const res: Response = await GET(req as any);
-    const data = await res.json();
+    const body = await res.json();
 
-    assert.ok(Array.isArray(data), "response should be an array");
-    assert.strictEqual(data.length, mockMembers.length);
+    assert.strictEqual(body.ok, true);
+    assert.ok(Array.isArray(body.data), "response data should be an array");
+    assert.strictEqual(body.data.length, mockMembers.length);
   } finally {
     if (previousMode === undefined) {
       delete process.env.DASHBOARD_API_MODE;
