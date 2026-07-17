@@ -1,5 +1,58 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
+import {
+  DEFAULT_LIST_LIMIT,
+  MAX_LIST_LIMIT,
+  normalisePagination,
+  paginateItems,
+} from "../lib/pagination";
+
+describe("pagination boundary helpers", () => {
+  test("normalisePagination falls back for zero and negative limits", () => {
+    assert.deepEqual(normalisePagination({ limit: 0 }), {
+      limit: DEFAULT_LIST_LIMIT,
+      page: 1,
+    });
+    assert.deepEqual(normalisePagination({ limit: -5 }), {
+      limit: DEFAULT_LIST_LIMIT,
+      page: 1,
+    });
+  });
+
+  test("normalisePagination clamps oversized limits", () => {
+    assert.deepEqual(normalisePagination({ limit: 999 }), {
+      limit: MAX_LIST_LIMIT,
+      page: 1,
+    });
+  });
+
+  test("normalisePagination falls back for non-numeric pages and malformed cursors", () => {
+    assert.deepEqual(normalisePagination({ page: Number.NaN }), {
+      limit: DEFAULT_LIST_LIMIT,
+      page: 1,
+    });
+    assert.deepEqual(normalisePagination({ cursor: "page:-1" }), {
+      limit: DEFAULT_LIST_LIMIT,
+      page: 1,
+    });
+    assert.deepEqual(normalisePagination({ cursor: "garbage" }), {
+      limit: DEFAULT_LIST_LIMIT,
+      page: 1,
+    });
+  });
+
+  test("paginateItems never uses a negative page window", () => {
+    assert.deepEqual(paginateItems(["a", "b", "c"], { limit: 1, page: -2 }), {
+      items: ["a"],
+      total: 3,
+      limit: 1,
+      page: 1,
+      nextCursor: "page:2",
+      hasNextPage: true,
+      hasPreviousPage: false,
+    });
+  });
+});
 
 describe("management list pagination and filtering", () => {
   test("GET /api/passes searches by name or description", async () => {

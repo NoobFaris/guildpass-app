@@ -13,7 +13,7 @@ export function normalisePagination(options: PaginationOptions = {}) {
   const limit = clampPositiveInteger(options.limit, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT);
   const cursorPage = decodePageCursor(options.cursor);
   const requestedPage = options.page ?? cursorPage ?? 1;
-  const page = Math.max(1, Math.floor(requestedPage));
+  const page = clampPositiveInteger(requestedPage, 1, Number.MAX_SAFE_INTEGER);
 
   return { limit, page };
 }
