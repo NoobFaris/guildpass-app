@@ -38,3 +38,12 @@ model IndexerCheckpoint {
   lastBlock     BigInt
   updatedAt     DateTime @updatedAt
 }
+
+/// Advisory lock used to coordinate the live indexer and the backfill CLI.
+/// holder is either "live-indexer" or "backfill".
+model BackfillLock {
+  holder      String    @id            // "live-indexer" | "backfill"
+  acquiredAt  DateTime
+  liveHead    BigInt?                  // current chain head (live-indexer only)
+  updatedAt   DateTime  @updatedAt
+}
