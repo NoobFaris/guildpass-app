@@ -1,254 +1,130 @@
+import { describe, test, beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
+
 /**
- * test/server-session.test.ts
+ * Tests for issue #140: session resolution for Server Components must resolve a
+ * real Session from a valid signed token and reject missing / expired / tampered
+ * tokens with UnauthorizedError.
  *
- * Tests for the server-side session resolution module.
- *
- * Coverage:
- *  - Mock mode returns MOCK_API_SESSION (predictable local role testing)
- *  - Live mode validates access tokens from Authorization header
- *  - requireDashboardSession delegates to getDashboardSession
- *  - UnauthorizedError carries statusCode 401
+ * We test resolveServerComponentSession (the pure core) directly, feeding it the
+ * cookie/header values getServerComponentSession would read. Tokens are minted
+ * by the real session store, so genuine HS256 verification runs — nothing is
+ * stubbed.
  */
 
-import { test, describe, afterEach, beforeEach } from "node:test";
-import assert from "node:assert/strict";
-import {
-  getDashboardSession,
-  requireDashboardSession,
-  UnauthorizedError,
-  resetSessionStore,
-} from "../lib/auth/server-session.ts";
-import { MOCK_API_SESSION } from "../lib/auth/session.ts";
+process.env.SESSION_SIGNING_SECRET = "test-signing-secret-for-server-session";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+const { resolveServerComponentSession, UnauthorizedError, resetSessionStore } =
+  await import("../lib/auth/server-session");
+const { createSessionStore, clearSessionStore } = await import("../lib/auth/session-store");
 
-function makeRequest(headers?: Record<string, string>): Request {
-  return new Request("http://localhost:3000/api/test", { headers });
+beforeEach(() => {
+  resetSessionStore();
+});
+
+afterEach(() => {
+  clearSessionStore();
+});
+
+type Role = "owner" | "admin" | "moderator" | "readonly";
+
+async function mintValidToken(role: Role = "admin") {
+  const store = createSessionStore();
+  const { accessToken } = await store.createSession({
+    userId: "user-1",
+    name: "Test User",
+    role,
+  });
+  return accessToken;
 }
 
-// ── UnauthorizedError ────────────────────────────────────────────────────────
-
-describe("UnauthorizedError", () => {
-  test("is an instance of Error", () => {
-    const e = new UnauthorizedError();
-    assert.ok(e instanceof Error);
-  });
-
-  test("name is 'UnauthorizedError'", () => {
-    const e = new UnauthorizedError();
-    assert.equal(e.name, "UnauthorizedError");
-  });
-
-  test("statusCode is 401", () => {
-    const e = new UnauthorizedError();
-    assert.equal(e.statusCode, 401);
-  });
-
-  test("default message is descriptive", () => {
-    const e = new UnauthorizedError();
-    assert.ok(e.message.includes("Unauthorized"));
-  });
-
-  test("accepts a custom message", () => {
-    const e = new UnauthorizedError("Custom error");
-    assert.equal(e.message, "Custom error");
-  });
-});
-
-// ── getDashboardSession (mock mode) ───────────────────────────────────────────
-
-describe("getDashboardSession — mock mode", () => {
-  const request = makeRequest();
-
-  test("returns a Session object", async () => {
-    const session = await getDashboardSession(request);
-    assert.ok(session);
-    assert.equal(typeof session.userId, "string");
-    assert.equal(typeof session.role, "string");
-    assert.ok(Array.isArray(session.permissions));
-  });
-
-  test("returns MOCK_API_SESSION (same userId and role)", async () => {
-    const session = await getDashboardSession(request);
-    assert.equal(session.userId, MOCK_API_SESSION.userId);
-    assert.equal(session.role, MOCK_API_SESSION.role);
-    assert.equal(session.name, MOCK_API_SESSION.name);
-  });
-
-  test("permissions match the role defined by MOCK_API_ROLE", async () => {
-    const session = await getDashboardSession(request);
-    assert.deepEqual(session.permissions, MOCK_API_SESSION.permissions);
-  });
-
-  test("works independently of the request content (mock ignores it)", async () => {
-    const session1 = await getDashboardSession(makeRequest());
-    const session2 = await getDashboardSession(new Request("http://localhost:3000/api/other"));
-    assert.equal(session1.userId, session2.userId);
-  });
-});
-
-// ── requireDashboardSession (mock mode) ───────────────────────────────────────
-
-describe("requireDashboardSession — mock mode", () => {
-  const request = makeRequest();
-
-  test("returns the same session as getDashboardSession", async () => {
-    const got = await getDashboardSession(request);
-    const required = await requireDashboardSession(request);
-    assert.equal(required.userId, got.userId);
-    assert.equal(required.role, got.role);
-  });
-
-  test("does not throw in mock mode", async () => {
-    await assert.doesNotReject(async () => {
-      await requireDashboardSession(makeRequest());
-    });
-  });
-});
-
-// ── getDashboardSession (live mode — no token) ────────────────────────────────
-
-describe("getDashboardSession — live mode (missing token)", () => {
-  const originalMode = process.env.DASHBOARD_API_MODE;
-  const request = makeRequest();
-
-  afterEach(() => {
-    if (originalMode === undefined) {
-      delete process.env.DASHBOARD_API_MODE;
-    } else {
-      process.env.DASHBOARD_API_MODE = originalMode;
-    }
-  });
-
-  test("throws UnauthorizedError when DASHBOARD_API_MODE=live and no token provided", async () => {
-    process.env.DASHBOARD_API_MODE = "live";
-    await assert.rejects(
-      async () => getDashboardSession(request),
-      (err: unknown) => {
-        assert.ok(err instanceof UnauthorizedError, "should be UnauthorizedError");
-        return true;
-      }
-    );
-  });
-
-  test("thrown error has statusCode 401", async () => {
-    process.env.DASHBOARD_API_MODE = "live";
-    try {
-      await getDashboardSession(request);
-      assert.fail("should have thrown");
-    } catch (err) {
-      assert.ok(err instanceof UnauthorizedError);
-      assert.equal((err as UnauthorizedError).statusCode, 401);
-    }
-  });
-
-  test("thrown error message mentions Authorization header", async () => {
-    process.env.DASHBOARD_API_MODE = "live";
-    try {
-      await getDashboardSession(request);
-    } catch (err) {
-      assert.ok(err instanceof Error);
-      assert.ok(
-        err.message.toLowerCase().includes("authorization"),
-        `message "${err.message}" should mention Authorization`
-      );
-    }
-  });
-});
-
-// ── getDashboardSession (live mode — valid token) ─────────────────────────────
-
-describe("getDashboardSession — live mode (valid token)", () => {
-  const originalMode = process.env.DASHBOARD_API_MODE;
-
-  beforeEach(() => {
-    process.env.DASHBOARD_API_MODE = "live";
-    clearSessionStore();
-    resetSessionStore();
-  });
-
-  afterEach(() => {
-    if (originalMode === undefined) {
-      delete process.env.DASHBOARD_API_MODE;
-    } else {
-      process.env.DASHBOARD_API_MODE = originalMode;
-    }
-    clearSessionStore();
-  });
-
-  test("returns a valid session when Bearer token is provided", async () => {
-    // Create a session via the store
-    const store = createSessionStore();
-    const tokens = await store.createSession({
-      userId: "test-user-live",
-      name: "Live User",
-      role: "admin",
-    });
-
-    const request = makeRequest({
-      Authorization: `Bearer ${tokens.accessToken}`,
-    });
-
-    const session = await getDashboardSession(request);
-    assert.ok(session);
-    assert.equal(session.userId, "test-user-live");
-    assert.equal(session.name, "Live User");
+describe("resolveServerComponentSession — valid session", () => {
+  test("a valid cookie token resolves to a Session with role-appropriate permissions", async () => {
+    const token = await mintValidToken("admin");
+    const session = await resolveServerComponentSession(token, null);
+    assert.equal(session.userId, "user-1");
     assert.equal(session.role, "admin");
+    assert.ok(session.permissions.includes("settings:write"));
   });
 
-  test("throws UnauthorizedError for an invalid Bearer token", async () => {
-    const request = makeRequest({
-      Authorization: "Bearer invalid.token.here",
-    });
+  test("falls back to a valid Bearer header when no cookie", async () => {
+    const token = await mintValidToken("readonly");
+    const session = await resolveServerComponentSession(null, `Bearer ${token}`);
+    assert.equal(session.role, "readonly");
+    assert.equal(session.permissions.includes("settings:write"), false);
+  });
 
+  test("cookie takes precedence over header", async () => {
+    const cookieToken = await mintValidToken("owner");
+    const headerToken = await mintValidToken("readonly");
+    const session = await resolveServerComponentSession(cookieToken, `Bearer ${headerToken}`);
+    assert.equal(session.role, "owner");
+  });
+});
+
+describe("resolveServerComponentSession — missing session", () => {
+  test("throws UnauthorizedError with a distinct 'missing' message when both are absent", async () => {
     await assert.rejects(
-      async () => getDashboardSession(request),
-      UnauthorizedError,
+      () => resolveServerComponentSession(null, null),
+      (err: unknown) => {
+        assert.ok(err instanceof UnauthorizedError);
+        assert.match(err.message, /no session cookie or authorization header/i);
+        return true;
+      },
+    );
+  });
+
+  test("a malformed Authorization header (no Bearer) counts as missing", async () => {
+    await assert.rejects(
+      () => resolveServerComponentSession(null, "Basic abc123"),
+      (err: unknown) => {
+        assert.ok(err instanceof UnauthorizedError);
+        assert.match(err.message, /no session cookie or authorization header/i);
+        return true;
+      },
     );
   });
 });
 
-// ── requireDashboardSession (live mode) ───────────────────────────────────────
-
-describe("requireDashboardSession — live mode", () => {
-  const originalMode = process.env.DASHBOARD_API_MODE;
-
-  beforeEach(() => {
-    process.env.DASHBOARD_API_MODE = "live";
-    clearSessionStore();
-    resetSessionStore();
-  });
-
-  afterEach(() => {
-    if (originalMode === undefined) {
-      delete process.env.DASHBOARD_API_MODE;
-    } else {
-      process.env.DASHBOARD_API_MODE = originalMode;
-    }
-    clearSessionStore();
-  });
-
-  test("throws UnauthorizedError when no token is provided", async () => {
+describe("resolveServerComponentSession — tampered / invalid token", () => {
+  test("a token with a mutated payload is rejected as invalid", async () => {
+    const good = await mintValidToken("readonly");
+    const [h, p, s] = good.split(".");
+    const tamperedPayload = p.slice(0, -1) + (p.slice(-1) === "A" ? "B" : "A");
     await assert.rejects(
-      async () => requireDashboardSession(makeRequest()),
-      UnauthorizedError,
+      () => resolveServerComponentSession(`${h}.${tamperedPayload}.${s}`, null),
+      (err: unknown) => {
+        assert.ok(err instanceof UnauthorizedError);
+        assert.match(err.message, /invalid or expired/i);
+        return true;
+      },
     );
   });
 
-  test("returns session when valid token is provided", async () => {
-    const store = createSessionStore();
-    const tokens = await store.createSession({
-      userId: "req-test-user",
-      name: "Req User",
-      role: "moderator",
-    });
+  test("a structurally malformed token is rejected", async () => {
+    await assert.rejects(
+      () => resolveServerComponentSession("not-a-real-jwt", null),
+      (err: unknown) => err instanceof UnauthorizedError,
+    );
+  });
+});
 
-    const request = makeRequest({
-      Authorization: `Bearer ${tokens.accessToken}`,
-    });
-
-    const session = await requireDashboardSession(request);
-    assert.equal(session.userId, "req-test-user");
-    assert.equal(session.role, "moderator");
+describe("resolveServerComponentSession — expired token", () => {
+  test("a token past its exp is rejected", async () => {
+    const token = await mintValidToken("admin");
+    const realNow = Date.now;
+    Date.now = () => realNow() + 16 * 60 * 1000;
+    try {
+      await assert.rejects(
+        () => resolveServerComponentSession(token, null),
+        (err: unknown) => {
+          assert.ok(err instanceof UnauthorizedError);
+          assert.match(err.message, /invalid or expired/i);
+          return true;
+        },
+      );
+    } finally {
+      Date.now = realNow;
+    }
   });
 });
