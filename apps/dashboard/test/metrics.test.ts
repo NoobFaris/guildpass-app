@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { MOCK_PASSES_METRICS, MOCK_MEMBERS_METRICS } from "./fixtures.ts";
+import { MOCK_PASSES_METRICS, MOCK_MEMBERS_METRICS } from "./fixtures";
 
 /**
  * metrics.test.ts

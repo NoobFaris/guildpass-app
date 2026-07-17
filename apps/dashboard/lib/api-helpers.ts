@@ -10,6 +10,11 @@ import type {
 } from "./api-contracts";
 import { isPublicApiError, ValidationError } from "@/lib/api-errors";
 
+export type UnsupportedResponse = {
+  error: string;
+  code: "UNSUPPORTED_IN_LIVE_MODE";
+};
+
 export function apiResponse<T>(
   data: T,
   init?: ResponseInit
@@ -78,7 +83,7 @@ function newErrorId(): string {
  * operations from transient errors, so it can show an appropriate UI instead of
  * silently falling back to mock data.
  */
-export function apiUnsupported(
+export function apiUnsupportedLegacy(
   message: string
 ): NextResponse<UnsupportedResponse> {
   return NextResponse.json(
