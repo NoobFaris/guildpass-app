@@ -9,6 +9,7 @@ type Log,
 import { mainnet } from "viem/chains";
 import { PrismaClient } from "@prisma/client";
 import { MEMBERSHIP_ABI, MEMBERSHIP_EVENTS } from "@guildpass/contracts";
+import { LeaderElectionService, FencingTokenError } from "../utils/leader-election.js";
 import { indexerLagBlocks, indexerPollCount } from "@guildpass/metrics";
 
 export interface IndexerConfig {
@@ -34,6 +35,19 @@ alreadyProcessed: boolean;
 
 /** Options passed to the shared processRange() method. */
 export interface ProcessRangeOptions {
+  contractAddress: Address;
+  fromBlock: bigint;
+  toBlock: bigint;
+  /**
+   * When true, the method collects and returns what would change without
+   * writing anything to the database.
+   */
+  dryRun?: boolean;
+  /**
+   * Current leader generation (fencing token). All writes within this
+   * range will be stamped with this token to prevent split-brain corruption.
+   */
+  fencingToken?: number;
 contractAddress: Address;
 fromBlock: bigint;
 toBlock: bigint;
@@ -111,7 +125,7 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
           else result.logsSkipped++;
         }
       } else {
-        const applied = await this.processLog(contractAddress, log);
+        const applied = await this.processLog(contractAddress, log, opts.fencingToken);
         if (applied) result.logsApplied++;
         else result.logsSkipped++;
       }
@@ -161,7 +175,11 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
     }
   }
 
-  async processLog(contractAddress: Address, log: Log): Promise<boolean> {
+  async processLog(
+    contractAddress: Address,
+    log: Log,
+    fencingToken?: number,
+  ): Promise<boolean> {
     const { transactionHash, logIndex, blockHash, blockNumber } = log;
     if (!transactionHash || logIndex === null || !blockHash || blockNumber === null) return false;
 
@@ -188,6 +206,8 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
       }
     }
 
+    const token = fencingToken ?? 0;
+
     try {
       const decoded = decodeEventLog({
         abi: MEMBERSHIP_ABI,
@@ -213,6 +233,7 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
             status: "processed",
             eventType: decoded.eventName,
             data: decoded.args as any,
+            fencingToken: token,
           },
           create: {
             contractAddress,
@@ -223,6 +244,7 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
             status: "processed",
             eventType: decoded.eventName,
             data: decoded.args as any,
+            fencingToken: token,
           },
         });
       });
@@ -308,14 +330,68 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
   }
 }
 
-// ─── Live indexer: owns the poll loop and checkpoint ──────────────────────────
+// ─── Live indexer: owns the poll loop, checkpoint, and leader election ───────
 
 export class MembershipIndexer extends IndexerCore {
+  private leaderElection: LeaderElectionService | null = null;
+  private running = false;
+
+  /**
+   * Attach a LeaderElectionService for distributed coordination.
+   * When attached, the indexer will:
+   *  - Only poll when this instance is the elected leader
+   *  - Write fencing tokens on checkpoints and processed events
+   *  - Verify leadership before each write to prevent split-brain
+   */
+  attachLeaderElection(service: LeaderElectionService): void {
+    this.leaderElection = service;
+
+    // When we become leader, kick off a poll immediately
+    service.onBecomeLeader = async () => {
+      if (this.running) {
+        console.log("[Indexer] Became leader — starting poll cycle");
+        try {
+          await this.poll();
+        } catch (err) {
+          console.error("[Indexer] Post-leadership poll error:", err);
+        }
+      }
+    };
+
+    // When we lose leadership, stop processing
+    service.onLoseLeadership = async () => {
+      console.log("[Indexer] Lost leadership — pausing processing");
+    };
+  }
+
   async start() {
+    this.running = true;
     console.log("Starting indexer...");
-    while (true) {
+
+    while (this.running) {
       try {
-        await this.poll();
+        // If leader election is attached, only poll when we're the leader
+        if (this.leaderElection) {
+          if (this.leaderElection.isLeader()) {
+            // Verify leadership is still valid before processing
+            try {
+              await this.leaderElection.verifyLeadershipOrThrow();
+              await this.poll();
+            } catch (err) {
+              if (err instanceof FencingTokenError) {
+                console.warn("[Indexer] Not the leader, skipping poll cycle");
+              } else {
+                throw err;
+              }
+            }
+          } else {
+            // Standby: just wait, the poll loop in LeaderElectionService
+            // will call onBecomeLeader when we acquire leadership
+          }
+        } else {
+          // No leader election — standalone mode (backward compatible)
+          await this.poll();
+        }
       } catch (error) {
         console.error("Indexer error:", error);
       }
@@ -323,11 +399,32 @@ export class MembershipIndexer extends IndexerCore {
     }
   }
 
+  /** Stop the indexer loop. */
+  stop(): void {
+    this.running = false;
+  }
+
   async poll() {
     const currentBlock = await this.getClient().getBlockNumber();
     const safeTip = currentBlock - BigInt(this.config.confirmationDepth);
 
+    // Get current fencing token if leader election is active
+    const fencingToken = this.leaderElection?.getGeneration();
+
     for (const contractAddress of this.config.contractAddresses) {
+      // Re-verify leadership before processing each contract
+      if (this.leaderElection) {
+        try {
+          await this.leaderElection.verifyLeadershipOrThrow();
+        } catch (err) {
+          if (err instanceof FencingTokenError) {
+            console.warn(`[Indexer] Lost leadership during poll, aborting`);
+            return;
+          }
+          throw err;
+        }
+      }
+
       const lastCheckpoint = await this.db.indexerCheckpoint.findUnique({
         where: { contractAddress },
       });
@@ -353,6 +450,27 @@ export class MembershipIndexer extends IndexerCore {
         `[${contractAddress}] Indexing from ${fromBlock} to ${toBlock}`,
       );
 
+      await this.processRange({
+        contractAddress,
+        fromBlock,
+        toBlock,
+        dryRun: false,
+        fencingToken,
+      });
+
+      // Write checkpoint with fencing token
+      await this.db.indexerCheckpoint.upsert({
+        where: { contractAddress },
+        update: {
+          lastBlock: toBlock,
+          ...(fencingToken !== undefined ? { fencingToken } : {}),
+        },
+        create: {
+          contractAddress,
+          lastBlock: toBlock,
+          ...(fencingToken !== undefined ? { fencingToken: fencingToken! } : {}),
+        },
+      });
       try {
         await this.processRange({ contractAddress, fromBlock, toBlock, dryRun: false });
 
