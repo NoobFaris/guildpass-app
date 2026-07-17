@@ -16,6 +16,7 @@ import type { ActivityEvent } from "@/lib/activity/types";
 import type { DashboardSettings } from "../../settings";
 import { mockPasses, mockGuilds, mockMembers } from "../../mock-data";
 import { DEFAULT_SETTINGS } from "../../settings";
+import { computeDiff } from "@/lib/activity/diff";
 
 /**
  * Mock pass repository: in-memory storage.
@@ -23,9 +24,11 @@ import { DEFAULT_SETTINGS } from "../../settings";
 export class MockPassRepository implements IPassRepository {
   private passes: Map<string, Pass> = new Map();
   private nextId = 5;
+  private activityRepo?: IActivityRepository;
 
-  constructor() {
+  constructor(activityRepo?: IActivityRepository) {
     mockPasses.forEach((p) => this.passes.set(p.id, { ...p }));
+    this.activityRepo = activityRepo;
   }
 
   async getAll(): Promise<Pass[]> {
@@ -44,6 +47,11 @@ export class MockPassRepository implements IPassRepository {
       createdAt: new Date().toISOString(),
     };
     this.passes.set(id, newPass);
+
+    // Record activity with structured diff
+    const changes = computeDiff({} as Record<string, unknown>, newPass as unknown as Record<string, unknown>);
+    await this.recordActivity("pass.created", `New pass created: ${newPass.name}`, newPass, changes);
+
     return newPass;
   }
 
@@ -52,11 +60,44 @@ export class MockPassRepository implements IPassRepository {
     if (!existing) return null;
     const updated = { ...existing, ...pass, id };
     this.passes.set(id, updated);
+
+    // Compute diff and record activity
+    const changes = computeDiff(
+      existing as unknown as Record<string, unknown>,
+      updated as unknown as Record<string, unknown>,
+    );
+    if (changes.length > 0) {
+      await this.recordActivity("pass.updated", `Pass updated: ${updated.name}`, updated, changes);
+    }
+
     return updated;
   }
 
   async delete(id: string): Promise<boolean> {
-    return this.passes.delete(id);
+    const existing = this.passes.get(id);
+    const deleted = this.passes.delete(id);
+    if (deleted && existing) {
+      await this.recordActivity("pass.deleted", `Pass deleted: ${existing.name}`, existing);
+    }
+    return deleted;
+  }
+
+  private async recordActivity(
+    type: ActivityEvent["type"],
+    description: string,
+    entity: Pass,
+    changes?: ActivityEvent["changes"],
+  ): Promise<void> {
+    if (!this.activityRepo) return;
+    await this.activityRepo.append({
+      type,
+      source: "dashboard",
+      severity: "info",
+      actor: { name: "Admin" },
+      description,
+      entity: { type: "pass", id: entity.id, name: entity.name },
+      changes,
+    });
   }
 }
 
@@ -66,9 +107,11 @@ export class MockPassRepository implements IPassRepository {
 export class MockGuildRepository implements IGuildRepository {
   private guilds: Map<string, Guild> = new Map();
   private nextId = 4;
+  private activityRepo?: IActivityRepository;
 
-  constructor() {
+  constructor(activityRepo?: IActivityRepository) {
     mockGuilds.forEach((g) => this.guilds.set(g.id, { ...g }));
+    this.activityRepo = activityRepo;
   }
 
   async getAll(): Promise<Guild[]> {
@@ -87,6 +130,10 @@ export class MockGuildRepository implements IGuildRepository {
       createdAt: new Date().toISOString(),
     };
     this.guilds.set(id, newGuild);
+
+    const changes = computeDiff({} as Record<string, unknown>, newGuild as unknown as Record<string, unknown>);
+    await this.recordActivity("guild.created", `New guild created: ${newGuild.name}`, newGuild, changes);
+
     return newGuild;
   }
 
@@ -95,11 +142,43 @@ export class MockGuildRepository implements IGuildRepository {
     if (!existing) return null;
     const updated = { ...existing, ...guild, id };
     this.guilds.set(id, updated);
+
+    const changes = computeDiff(
+      existing as unknown as Record<string, unknown>,
+      updated as unknown as Record<string, unknown>,
+    );
+    if (changes.length > 0) {
+      await this.recordActivity("guild.updated", `Guild updated: ${updated.name}`, updated, changes);
+    }
+
     return updated;
   }
 
   async delete(id: string): Promise<boolean> {
-    return this.guilds.delete(id);
+    const existing = this.guilds.get(id);
+    const deleted = this.guilds.delete(id);
+    if (deleted && existing) {
+      await this.recordActivity("guild.deleted", `Guild deleted: ${existing.name}`, existing);
+    }
+    return deleted;
+  }
+
+  private async recordActivity(
+    type: ActivityEvent["type"],
+    description: string,
+    entity: Guild,
+    changes?: ActivityEvent["changes"],
+  ): Promise<void> {
+    if (!this.activityRepo) return;
+    await this.activityRepo.append({
+      type,
+      source: "dashboard",
+      severity: "info",
+      actor: { name: "Admin" },
+      description,
+      entity: { type: "guild", id: entity.id, name: entity.name },
+      changes,
+    });
   }
 }
 
@@ -110,12 +189,14 @@ export class MockMemberRepository implements IMemberRepository {
   private members: Map<string, Member> = new Map();
   private walletIndex: Map<string, string> = new Map();
   private nextId = 5;
+  private activityRepo?: IActivityRepository;
 
-  constructor() {
+  constructor(activityRepo?: IActivityRepository) {
     mockMembers.forEach((m) => {
       this.members.set(m.id, { ...m });
       this.walletIndex.set(m.wallet, m.id);
     });
+    this.activityRepo = activityRepo;
   }
 
   async getAll(): Promise<Member[]> {
@@ -136,6 +217,10 @@ export class MockMemberRepository implements IMemberRepository {
     const newMember: Member = { ...member, id };
     this.members.set(id, newMember);
     this.walletIndex.set(member.wallet, id);
+
+    const changes = computeDiff({} as Record<string, unknown>, newMember as unknown as Record<string, unknown>);
+    await this.recordActivity("member.joined", `${newMember.name} joined`, newMember, changes);
+
     return newMember;
   }
 
@@ -148,6 +233,23 @@ export class MockMemberRepository implements IMemberRepository {
       this.walletIndex.delete(existing.wallet);
       this.walletIndex.set(member.wallet, id);
     }
+
+    // Compute diff to determine what changed and what event type to emit
+    const changes = computeDiff(
+      existing as unknown as Record<string, unknown>,
+      updated as unknown as Record<string, unknown>,
+    );
+    if (changes.length > 0) {
+      const hasRoleChange = changes.some((c) => c.field === "roles");
+      const eventType: ActivityEvent["type"] = hasRoleChange
+        ? "member.roles_changed"
+        : "member.left"; // status/other changes use member.left as generic update
+      const desc = hasRoleChange
+        ? `${updated.name}'s roles changed`
+        : `Member ${updated.name} updated`;
+      await this.recordActivity(eventType, desc, updated, changes);
+    }
+
     return updated;
   }
 
@@ -156,7 +258,29 @@ export class MockMemberRepository implements IMemberRepository {
     if (existing) {
       this.walletIndex.delete(existing.wallet);
     }
-    return this.members.delete(id);
+    const deleted = this.members.delete(id);
+    if (deleted && existing) {
+      await this.recordActivity("member.left", `${existing.name} left`, existing);
+    }
+    return deleted;
+  }
+
+  private async recordActivity(
+    type: ActivityEvent["type"],
+    description: string,
+    entity: Member,
+    changes?: ActivityEvent["changes"],
+  ): Promise<void> {
+    if (!this.activityRepo) return;
+    await this.activityRepo.append({
+      type,
+      source: "dashboard",
+      severity: "info",
+      actor: { name: entity.name, wallet: entity.wallet },
+      description,
+      entity: { type: "member", id: entity.id, name: entity.name },
+      changes,
+    });
   }
 }
 
@@ -219,13 +343,37 @@ export class MockActivityRepository implements IActivityRepository {
  */
 export class MockSettingsRepository implements ISettingsRepository {
   private settings: DashboardSettings = { ...DEFAULT_SETTINGS };
+  private activityRepo?: IActivityRepository;
+
+  constructor(activityRepo?: IActivityRepository) {
+    this.activityRepo = activityRepo;
+  }
 
   async get(): Promise<DashboardSettings> {
     return { ...this.settings };
   }
 
   async update(patch: Partial<DashboardSettings>): Promise<DashboardSettings> {
+    const previous = { ...this.settings };
     this.settings = { ...this.settings, ...patch };
+
+    // Compute field-level diff and record activity
+    const changes = computeDiff(
+      previous as unknown as Record<string, unknown>,
+      this.settings as unknown as Record<string, unknown>,
+    );
+    if (changes.length > 0 && this.activityRepo) {
+      await this.activityRepo.append({
+        type: "guild.updated",
+        source: "dashboard",
+        severity: "info",
+        actor: { name: "Admin" },
+        description: `Settings updated: ${changes.map((c) => c.field).join(", ")}`,
+        entity: { type: "guild", id: "settings", name: this.settings.workspaceName },
+        changes,
+      });
+    }
+
     return { ...this.settings };
   }
 }

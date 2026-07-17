@@ -50,6 +50,7 @@ function convertMockActivityToEvent(activity: Activity): ActivityEvent {
     },
     timestamp: activity.timestamp,
     description: activity.description,
+    changes: activity.changes,
   };
 }
 

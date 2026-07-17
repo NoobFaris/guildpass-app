@@ -16,6 +16,7 @@ import type {
 import type { Pass, Guild, Member } from "../../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
 import type { DashboardSettings } from "../../settings";
+import { computeDiff } from "@/lib/activity/diff";
 
 /**
  * Base class for durable repositories.
@@ -23,9 +24,11 @@ import type { DashboardSettings } from "../../settings";
  */
 abstract class DurableRepository {
   protected connectionString: string;
+  protected activityRepo?: IActivityRepository;
 
-  constructor(connectionString: string) {
+  constructor(connectionString: string, activityRepo?: IActivityRepository) {
     this.connectionString = connectionString;
+    this.activityRepo = activityRepo;
     this.validateConnection();
   }
 
@@ -33,6 +36,41 @@ abstract class DurableRepository {
     if (!this.connectionString) {
       throw new Error("Database connection string is not configured");
     }
+  }
+
+  /**
+   * Compute and record a field-level audit diff after a mutation.
+   * Subclasses should call this within the same transaction as the write.
+   *
+   * @param previous Pre-mutation entity state
+   * @param next     Post-mutation entity state
+   * @param type     Activity event type to emit
+   * @param description Human-readable description
+   * @param entityType  Entity discriminator for the activity record
+   * @param entityId    Entity identifier
+   * @param entityName  Optional display name
+   */
+  protected async recordDiff<T extends Record<string, unknown>>(
+    previous: T,
+    next: T,
+    type: ActivityEvent["type"],
+    description: string,
+    entityType: "pass" | "guild" | "member",
+    entityId: string,
+    entityName?: string,
+  ): Promise<void> {
+    if (!this.activityRepo) return;
+    const changes = computeDiff(previous, next);
+    if (changes.length === 0) return;
+    await this.activityRepo.append({
+      type,
+      source: "dashboard",
+      severity: "info",
+      actor: { name: "Admin" },
+      description,
+      entity: { type: entityType, id: entityId, name: entityName },
+      changes,
+    });
   }
 }
 
@@ -48,24 +86,25 @@ abstract class DurableRepository {
 export class DurablePassRepository extends DurableRepository implements IPassRepository {
   async getAll(): Promise<Pass[]> {
     // TODO: Implement against selected backend
-    // Example pseudocode:
-    // const result = await db.query("SELECT * FROM passes ORDER BY created_at DESC");
-    // return result.rows.map(row => this.mapRowToPass(row));
     throw new Error("DurablePassRepository not yet implemented. Configure STORAGE_BACKEND in .env");
   }
 
   async getById(_id: string): Promise<Pass | null> {
-    // TODO: Implement
     throw new Error("DurablePassRepository not yet implemented");
   }
 
   async create(_pass: Omit<Pass, "id" | "createdAt">): Promise<Pass> {
-    // TODO: Implement with transaction support
+    // TODO: Implement with transaction support:
+    // 1. INSERT into passes table
+    // 2. Call this.recordDiff({}, created, "pass.created", desc, "pass", id, name)
     throw new Error("DurablePassRepository not yet implemented");
   }
 
   async update(_id: string, _pass: Partial<Pass>): Promise<Pass | null> {
-    // TODO: Implement with optimistic locking or version column
+    // TODO: Implement with optimistic locking or version column:
+    // 1. SELECT ... FOR UPDATE (or equivalent)
+    // 2. Call this.recordDiff(existing, updated, "pass.updated", desc, "pass", id, name)
+    // 3. UPDATE
     throw new Error("DurablePassRepository not yet implemented");
   }
 
@@ -126,10 +165,14 @@ export class DurableMemberRepository extends DurableRepository implements IMembe
   }
 
   async create(_member: Omit<Member, "id">): Promise<Member> {
+    // TODO: Within transaction — INSERT, then this.recordDiff({}, created, "member.joined", desc, "member", id, name)
     throw new Error("DurableMemberRepository not yet implemented");
   }
 
   async update(_id: string, _member: Partial<Member>): Promise<Member | null> {
+    // TODO: Within transaction — SELECT FOR UPDATE, compute diff via
+    // this.recordDiff(existing, updated, eventType, desc, "member", id, name),
+    // then UPDATE. Use member.roles_changed when roles differ, otherwise member.left.
     throw new Error("DurableMemberRepository not yet implemented");
   }
 
@@ -182,6 +225,9 @@ export class DurableSettingsRepository extends DurableRepository implements ISet
   }
 
   async update(_patch: Partial<DashboardSettings>): Promise<DashboardSettings> {
+    // TODO: Within transaction — read current, apply patch, call
+    // this.recordDiff(previous, updated, "guild.updated", desc, "guild", "settings", name),
+    // then write back.
     throw new Error("DurableSettingsRepository not yet implemented");
   }
 }

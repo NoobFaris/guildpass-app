@@ -51,6 +51,7 @@ function toActivityEvent(activity: Activity | ActivityEvent): ActivityEvent {
     },
     timestamp: activity.timestamp,
     description: activity.description,
+    changes: activity.changes,
   };
 }
 

@@ -8,6 +8,7 @@ import {
   type ActivityEventSource,
   type ActivityEventType,
 } from "@guildpass/integration-client";
+import type { ActivityChange } from "@guildpass/integration-client";
 import { useMemo, useState } from "react";
 
 const TYPE_ICON: Record<ActivityEventType, string> = {
@@ -240,6 +241,18 @@ export default function ActivityPage() {
                         {activity.entity.type}: {activity.entity.name || activity.entity.id}
                       </p>
                     )}
+                    {activity.changes && activity.changes.length > 0 && (
+                      <details className="mt-2 group">
+                        <summary className="text-xs font-medium text-primary-600 cursor-pointer hover:text-primary-700 select-none">
+                          {activity.changes.length} field{activity.changes.length !== 1 ? "s" : ""} changed
+                        </summary>
+                        <div className="mt-2 space-y-1.5 pl-2 border-l-2 border-primary-100">
+                          {activity.changes.map((change) => (
+                            <DiffRow key={change.field} change={change} />
+                          ))}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 </li>
               ))}
@@ -261,5 +274,30 @@ export default function ActivityPage() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+/** Formats a diff value for display. Arrays are comma-joined; objects are JSON-summarized. */
+function formatDiffValue(value: unknown): string {
+  if (value === undefined || value === null) return "—";
+  if (Array.isArray(value)) return value.length > 0 ? value.join(", ") : "(empty)";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function DiffRow({ change }: { change: ActivityChange }) {
+  return (
+    <div className="text-xs">
+      <span className="font-semibold text-slate-700">{change.field}</span>
+      <div className="flex items-center gap-1.5 mt-0.5">
+        <span className="inline-block px-1.5 py-0.5 rounded bg-red-50 text-red-700 font-mono text-[11px] line-through">
+          {formatDiffValue(change.before)}
+        </span>
+        <span className="text-slate-300">→</span>
+        <span className="inline-block px-1.5 py-0.5 rounded bg-green-50 text-green-700 font-mono text-[11px]">
+          {formatDiffValue(change.after)}
+        </span>
+      </div>
+    </div>
   );
 }

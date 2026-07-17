@@ -50,6 +50,28 @@ export type ActivityEventEntity = {
   name?: string;
 };
 
+/**
+ * A single field-level change recorded in an activity event's audit diff.
+ * `before` and `after` hold the pre- and post-mutation values respectively —
+ * both may be undefined if the field was absent before or removed after.
+ */
+export type ActivityChange = {
+  field: string;
+  before: unknown;
+  after: unknown;
+};
+
+/**
+ * Fields that MUST NOT appear in an audit diff under any circumstances.
+ * Add future write-only secrets (e.g. apiKey, privateKey) here so they are
+ * provably excluded — never diff a value that shouldn't be readable even in
+ * an audit trail.
+ */
+export const SENSITIVE_AUDIT_FIELDS = new Set<string>([
+  // Reserved for future write-only / secret fields (ref #59, #80):
+  // "apiKey", "privateKey", "secret",
+]);
+
 export type ActivityEvent = {
   id: string;
   type: ActivityEventType;
@@ -64,4 +86,6 @@ export type ActivityEvent = {
   description: string;
   entity?: ActivityEventEntity;
   metadata?: Record<string, any>;
+  /** Structured before/after diff for field-level audit. Optional for backward compatibility. */
+  changes?: ActivityChange[];
 };
