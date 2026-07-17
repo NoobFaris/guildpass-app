@@ -29,12 +29,27 @@ const DEFAULT_REFRESH_MS = 15_000; // 15 seconds
 const DEFAULT_MAX_EVENTS = 500;
 
 export function getActivityRefreshConfig(): ActivityRefreshConfig {
-  const intervalMs =
-    Number(process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS) || DEFAULT_REFRESH_MS;
-  const maxEvents =
-    Number(process.env.NEXT_PUBLIC_ACTIVITY_MAX_EVENTS) || DEFAULT_MAX_EVENTS;
+  const intervalMs = parseNonNegativeInteger(
+    process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS,
+    DEFAULT_REFRESH_MS
+  );
+  const maxEvents = parsePositiveInteger(
+    process.env.NEXT_PUBLIC_ACTIVITY_MAX_EVENTS,
+    DEFAULT_MAX_EVENTS
+  );
 
   return { intervalMs, maxEvents };
+}
+
+function parseNonNegativeInteger(value: string | undefined, fallback: number): number {
+  if (value === undefined || value.trim() === "") return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = parseNonNegativeInteger(value, fallback);
+  return parsed > 0 ? parsed : fallback;
 }
 
 export function getApiMode(): "mock" | "live" {

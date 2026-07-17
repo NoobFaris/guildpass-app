@@ -3,6 +3,7 @@ import { verifySignature } from "@guildpass/webhook-utils";
 import { getEnv } from "@/lib/env";
 import { mapWebhookToActivity } from "@/lib/activity/mapper";
 import { activityStorage } from "@/lib/activity/storage";
+import { publishActivityEvent } from "@/lib/activity/stream";
 import { apiError, apiResponse, apiValidationError } from "@/lib/api-helpers";
 import { validateWebhookPayload } from "@/lib/activity/validation";
 
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
         return apiResponse({ status: "ignored", reason: "duplicate" });
       }
 
+      publishActivityEvent(activity);
       return apiResponse({ status: "success", id: activity.id });
     }
 

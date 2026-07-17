@@ -15,7 +15,7 @@ export default function GuildsPage() {
   const canWrite = canManageGuilds(session);
   const [guilds, setGuilds] = useState<MockGuild[]>(mockGuilds);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
-  const [listState, setListState] = useState<"loading" | "loaded" | "unsupported" | "error">("loading");
+  const [listState] = useState<"loading" | "loaded" | "unsupported" | "error">("loading");
   const previousGuildsRef = useRef<MockGuild[]>(guilds);
   const apiMode = getClientApiMode();
 

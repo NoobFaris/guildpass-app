@@ -96,28 +96,28 @@ export const SESSION_ADMIN: Session = {
   userId: "test-admin-001",
   name: "Test Admin",
   role: "admin",
-  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "settings:read", "settings:write"],
+  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "activity:read", "settings:read", "settings:write"],
 };
 
 export const SESSION_MODERATOR: Session = {
   userId: "test-mod-001",
   name: "Test Moderator",
   role: "moderator",
-  permissions: ["passes:read", "members:read", "members:write", "guilds:read", "settings:read"],
+  permissions: ["passes:read", "members:read", "members:write", "guilds:read", "activity:read", "settings:read"],
 };
 
 export const SESSION_READONLY: Session = {
   userId: "test-readonly-001",
   name: "Test Viewer",
   role: "readonly",
-  permissions: ["passes:read", "members:read", "guilds:read", "settings:read"],
+  permissions: ["passes:read", "members:read", "guilds:read", "activity:read", "settings:read"],
 };
 
 export const SESSION_OWNER: Session = {
   userId: "test-owner-001",
   name: "Test Owner",
   role: "owner",
-  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "settings:read", "settings:write"],
+  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "activity:read", "settings:read", "settings:write"],
 };
 
 export const MOCK_PASSES_METRICS = [

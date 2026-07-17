@@ -21,7 +21,7 @@ const EnvelopeSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
   created: z.number().positive(),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 
 export function validateWebhookPayload(rawBody: string): ValidationResult {
@@ -37,10 +37,11 @@ export function validateWebhookPayload(rawBody: string): ValidationResult {
   const envelopeResult = EnvelopeSchema.safeParse(parsed);
   if (!envelopeResult.success) {
     const error = envelopeResult.error.issues[0];
+    const field = error.path.join(".") || "body";
     return {
       valid: false,
-      error: error.message,
-      field: error.path.join("."),
+      error: `${field}: ${error.message}`,
+      field,
     };
   }
 
@@ -54,10 +55,11 @@ export function validateWebhookPayload(rawBody: string): ValidationResult {
 
     if (!dataResult.success) {
       const error = dataResult.error.issues[0];
+      const field = `data.${error.path.join(".")}`.replace(/\.$/, "");
       return {
         valid: false,
-        error: error.message,
-        field: `data.${error.path.join(".")}`,
+        error: `${field}: ${error.message}`,
+        field,
       };
     }
   }

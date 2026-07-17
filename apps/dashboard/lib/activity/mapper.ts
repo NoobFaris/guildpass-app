@@ -22,18 +22,16 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         type: "member.joined",
         source: "webhook",
         severity: "info",
-       actor: {
-         name: typeof data.name === "string" ? data.name : undefined,
-         wallet: typeof data.wallet === "string" ? data.wallet : undefined,
-         },
+        actor: {
+          name: typeof data.name === "string" ? data.name : undefined,
+          wallet: typeof data.wallet === "string" ? data.wallet : undefined,
+        },
         description: `New member joined: ${memberLabel}`,
         timestamp,
         entity: {
           type: "member",
-          id: data.id ?? data.wallet ?? "unknown",
-          name: displayValue(data.name, data.wallet, data.id),
           id: entityId(data.id, data.wallet, data.name),
-         name: typeof data.name === "string" ? data.name : undefined,
+          name: typeof data.name === "string" ? data.name : undefined,
         },
         metadata: data,
       };
@@ -47,18 +45,16 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         type: "member.left",
         source: "webhook",
         severity: "info",
-       actor: {
-      name: typeof data.name === "string" ? data.name : undefined,   
-      wallet: typeof data.wallet === "string" ? data.wallet : undefined,
-         },
+        actor: {
+          name: typeof data.name === "string" ? data.name : undefined,
+          wallet: typeof data.wallet === "string" ? data.wallet : undefined,
+        },
         description: `Member ${memberLabel} updated`,
         timestamp,
         entity: {
           type: "member",
-          id: data.id ?? data.wallet ?? "unknown",
-          name: displayValue(data.name, data.wallet, data.id),
           id: entityId(data.id, data.wallet, data.name),
-         name: typeof data.name === "string" ? data.name : undefined,
+          name: typeof data.name === "string" ? data.name : undefined,
         },
         metadata: data,
       };
@@ -102,7 +98,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         entity: {
           type: "pass",
           id: entityId(data.id, data.name),
-         name: typeof data.name === "string" ? data.name : undefined,
+          name: typeof data.name === "string" ? data.name : undefined,
         },
         metadata: data,
       };
@@ -137,8 +133,8 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         source: "webhook",
         severity: "info",
         actor: {
-        wallet: typeof data.wallet === "string" ? data.wallet : undefined,
-         },
+          wallet: typeof data.wallet === "string" ? data.wallet : undefined,
+        },
         description: `Verification completed for ${displayValue(data.wallet)}`,
         timestamp,
         entity: {

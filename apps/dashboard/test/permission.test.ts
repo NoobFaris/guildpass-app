@@ -5,6 +5,7 @@ import {
   canManagePasses,
   canManageMembers,
   canManageGuilds,
+  canViewActivity,
   canEditSettings,
   assertPermission,
   PermissionDeniedError,
@@ -99,6 +100,15 @@ describe("canManageGuilds", () => {
 
   test("returns false for readonly (no guilds:write)", () => {
     assert.equal(canManageGuilds(SESSION_READONLY), false);
+  });
+});
+
+describe("canViewActivity", () => {
+  test("returns true for every dashboard role", () => {
+    assert.equal(canViewActivity(SESSION_OWNER), true);
+    assert.equal(canViewActivity(SESSION_ADMIN), true);
+    assert.equal(canViewActivity(SESSION_MODERATOR), true);
+    assert.equal(canViewActivity(SESSION_READONLY), true);
   });
 });
 
@@ -200,6 +210,7 @@ describe("Role permission matrix — read permissions are universal", () => {
     "passes:read",
     "members:read",
     "guilds:read",
+    "activity:read",
     "settings:read",
   ];
 

@@ -29,8 +29,8 @@ test("validateWebhookPayload rejects invalid event data shape", () => {
     id: "evt_123",
     type: "pass.created",
     created: 1715000000,
-    data: { invalidField: "should-not-be-here" }, // This might pass schema depending on strictness
-    // If strictness is needed, use z.strictObject in lib/activity/validation.ts
+    data: { name: 123 },
   };
-  // Depending on your schema, this should ideally be handled or validated
+  const result = validateWebhookPayload(JSON.stringify(invalidData));
+  assert.strictEqual(result.valid, false);
 });
