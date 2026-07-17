@@ -194,8 +194,103 @@ import type {
   JsonRpcRequest,
   JsonRpcResponse,
   ContractCallOptions,
+  ActivityEvent,
+  CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
+} from "@guildpass/integration-client";
+
+import {
+  upcastActivityEvent,
+  upcastActivityEvents,
+  detectSchemaVersion,
 } from "@guildpass/integration-client";
 ```
+
+## ActivityEvent schema versioning
+
+`ActivityEvent` carries an explicit `schemaVersion` field so that historical
+events stored in durable storage remain readable as the type evolves.
+
+### How it works
+
+1. Every new event is written with `schemaVersion` set to
+   `CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION`.
+2. Events stored **before** versioning was introduced (V1) have no
+   `schemaVersion` field. They are treated as version 1.
+3. When reading events from storage, call `upcastActivityEvent()` (or
+   `upcastActivityEvents()` for batches) to walk the event through the
+   migration chain. The returned object always conforms to the current
+   `ActivityEvent` shape.
+
+```ts
+import {
+  upcastActivityEvent,
+  upcastActivityEvents,
+  CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
+} from "@guildpass/integration-client";
+
+// Single event (e.g. reading from a JSONL line)
+const raw = JSON.parse(jsonLine);
+const event = upcastActivityEvent(raw);
+// event.schemaVersion === CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION
+
+// Batch (e.g. reading all events from storage)
+const raws = lines.map((line) => JSON.parse(line));
+const events = upcastActivityEvents(raws);
+```
+
+### Adding a new field or event type (contributor guide)
+
+Follow these steps to safely evolve `ActivityEvent` without breaking stored
+data or older consumers during a rolling deployment:
+
+#### Adding a new optional field
+
+1. Add the field to `ActivityEvent` in `packages/integration-client/src/types.ts`
+   as **optional**.
+2. Bump `CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION` by 1.
+3. Add a migration entry in `packages/integration-client/src/activity-event-migration.ts`:
+
+   ```ts
+   // V2 → V3
+   MIGRATIONS.set(2, (event) => ({
+     ...event,
+     schemaVersion: 3,
+     newField: event.newField ?? "default value",
+   }));
+   ```
+
+4. All producers (mapper, service, etc.) should start setting the new field.
+5. Add a test with a V2 fixture that asserts correct upcast to V3 with the
+   default value.
+6. Run `pnpm -r typecheck` and `pnpm -r test`.
+
+#### Adding a new event type
+
+1. Add the string to the `ActivityEventType` union in `types.ts`.
+2. No migration entry is needed — existing events don't reference the new type.
+3. Add mapping logic in the dashboard mapper and any consumers.
+4. Document the new type in code comments.
+
+#### Removing or renaming a field
+
+This is a **breaking change** for stored data. Avoid it if possible. If
+unavoidable:
+
+1. Keep the old field as optional in the type (deprecated).
+2. Add the new field alongside it.
+3. Write a migration that copies the old value to the new field.
+4. Remove the old field in a future version after all stored data has been
+   migrated.
+
+### Exports
+
+| Export | Description |
+| --- | --- |
+| `CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION` | The current schema version number (bump on each change) |
+| `upcastActivityEvent(raw)` | Migrate a single stored event to the current shape |
+| `upcastActivityEvents(raws)` | Migrate an array of stored events |
+| `detectSchemaVersion(event)` | Return the schema version of a raw event (defaults to 1) |
+| `RawActivityEvent` | Loose type for raw/stored events before upcasting |
 
 ## Development
 

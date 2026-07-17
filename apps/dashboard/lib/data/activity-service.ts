@@ -1,4 +1,4 @@
-import { ActivityEvent } from "@guildpass/integration-client";
+import { ActivityEvent, CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 import { ActivityQuery, ActivityQueryResult } from "../activity/query";
 import { activityStorage } from "../activity/storage";
 
@@ -19,11 +19,12 @@ class ActivityService {
   /**
    * Create a new activity event and store it
    */
-  async createEvent(event: Omit<ActivityEvent, "id" | "timestamp">): Promise<ActivityEvent> {
+  async createEvent(event: Omit<ActivityEvent, "id" | "timestamp"> & Partial<Pick<ActivityEvent, "schemaVersion">>): Promise<ActivityEvent> {
     const fullEvent: ActivityEvent = {
       ...event,
       id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
+      schemaVersion: event.schemaVersion ?? CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
     };
 
     await activityStorage.addEvent(fullEvent);

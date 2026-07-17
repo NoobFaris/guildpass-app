@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type ActivityEvent } from "@guildpass/integration-client";
+import { type ActivityEvent, CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 import { connectActivityStream } from "@/lib/activity/client-stream";
 import { filterActivityEvents, type ActivityQuery } from "@/lib/activity/query";
 import { getActivityRefreshConfig } from "@/lib/env";
@@ -51,6 +51,7 @@ function toActivityEvent(activity: Activity | ActivityEvent): ActivityEvent {
     actor: { name: activity.actor },
     timestamp: activity.timestamp,
     description: activity.description,
+    schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
   };
 }
 

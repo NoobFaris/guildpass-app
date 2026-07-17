@@ -161,7 +161,7 @@ export class DurableMemberRepository extends DurableRepository implements IMembe
  * - Keep raw JSON metadata for future schema evolution
  */
 export class DurableActivityRepository extends DurableRepository implements IActivityRepository {
-  async append(_event: Omit<ActivityEvent, "id" | "timestamp">): Promise<ActivityEvent> {
+  async append(_event: Omit<ActivityEvent, "id" | "timestamp"> & Partial<Pick<ActivityEvent, "schemaVersion">>): Promise<ActivityEvent> {
     throw new Error("DurableActivityRepository not yet implemented");
   }
 

@@ -8,6 +8,13 @@ import type { ActivityEvent } from "@/lib/activity/types";
 import type { DashboardSettings } from "../settings";
 import type { PaginatedResponse } from "../api-contracts";
 
+/**
+ * Input type for appending an activity event.
+ * `schemaVersion` defaults to the current version when omitted.
+ */
+export type ActivityEventInput = Omit<ActivityEvent, "id" | "timestamp"> &
+  Partial<Pick<ActivityEvent, "schemaVersion">>;
+
 export interface PaginationOptions {
   limit?: number;
   cursor?: string | null;
@@ -138,9 +145,10 @@ export interface IMemberRepository {
  */
 export interface IActivityRepository {
   /**
-   * Append an activity event.
+   * Append an activity event. `schemaVersion` defaults to the current version
+   * when omitted.
    */
-  append(event: Omit<ActivityEvent, "id" | "timestamp">): Promise<ActivityEvent>;
+  append(event: ActivityEventInput): Promise<ActivityEvent>;
 
   /**
    * Query activity events with optional filtering.

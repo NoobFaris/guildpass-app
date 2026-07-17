@@ -51,6 +51,12 @@ export type ActivityEventEntity = {
   name?: string;
 };
 
+/**
+ * The current schema version for ActivityEvent.
+ * Bump this when adding/removing/renaming fields on ActivityEvent.
+ */
+export const CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION = 2;
+
 export type ActivityEvent = {
   id: string;
   type: ActivityEventType;
@@ -65,4 +71,9 @@ export type ActivityEvent = {
   description: string;
   entity?: ActivityEventEntity;
   metadata?: Record<string, any>;
+  /**
+   * Explicit schema version for backward-compatible migration.
+   * Legacy events stored without this field are treated as version 1.
+   */
+  schemaVersion: number;
 };

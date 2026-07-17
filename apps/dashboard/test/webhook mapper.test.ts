@@ -2,6 +2,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { WEBHOOK_FIXTURES, makeWebhookPayload } from "./fixtures.ts";
 import type { ActivityEvent } from "../lib/activity/types.ts";
+import { CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 import type { WebhookPayload } from "../lib/activity/types.ts";
 
 /**
@@ -39,6 +40,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: { type: "member", id: entityId, name },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     case "membership.updated":
       return {
@@ -51,6 +53,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: { type: "member", id: entityId, name },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     case "pass.created":
       return {
@@ -63,6 +66,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: { type: "pass", id: entityId, name },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     case "pass.updated":
       return {
@@ -75,6 +79,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: { type: "pass", id: entityId, name },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     case "guild.updated":
       return {
@@ -87,6 +92,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: { type: "guild", id: entityId, name },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     case "verification.completed":
       return {
@@ -99,6 +105,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         timestamp,
         entity: { type: "verification", id: entityId },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     default:
       return null;

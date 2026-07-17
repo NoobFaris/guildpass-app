@@ -6,6 +6,7 @@
  */
 
 import type { ActivityEvent } from "../lib/activity/types";
+import { CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 import type { Session } from "../lib/auth/session";
 import type { WebhookPayload } from "../lib/activity/types";
 
@@ -21,6 +22,7 @@ export function makeActivityEvent(overrides: Partial<ActivityEvent> = {}): Activ
     actor: { name: "Alice", wallet: "0xabc" },
     timestamp: FIXED_TIMESTAMP,
     description: "Alice joined the guild",
+    schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
     ...overrides,
   };
 }

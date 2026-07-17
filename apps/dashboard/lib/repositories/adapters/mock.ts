@@ -16,6 +16,7 @@ import type {
 } from "../types";
 import type { Pass, Guild, Member } from "../../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
+import { CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 import type { DashboardSettings } from "../../settings";
 import { mockPasses, mockGuilds, mockMembers } from "../../mock-data";
 import { DEFAULT_SETTINGS } from "../../settings";
@@ -181,11 +182,12 @@ export class MockActivityRepository implements IActivityRepository {
   private events: ActivityEvent[] = [];
   private processedIds: Set<string> = new Set();
 
-  async append(event: Omit<ActivityEvent, "id" | "timestamp">): Promise<ActivityEvent> {
+  async append(event: Omit<ActivityEvent, "id" | "timestamp"> & Partial<Pick<ActivityEvent, "schemaVersion">>): Promise<ActivityEvent> {
     const fullEvent: ActivityEvent = {
       ...event,
       id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString(),
+      schemaVersion: event.schemaVersion ?? CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
     };
     this.events.unshift(fullEvent);
     this.processedIds.add(fullEvent.id);

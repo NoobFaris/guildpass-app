@@ -1,4 +1,5 @@
 import type { ActivityEvent, ActivityEventType, ActivityEventEntity, ActivityEventSeverity } from "./types";
+import { CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 import { getActivityRepository } from "@/lib/repositories/factory";
 import type { Session } from "@/lib/auth/session";
 import { publishActivityEvent } from "./stream";
@@ -54,6 +55,7 @@ export async function recordDashboardActivity(
     actor: input.actor ?? { name: "Admin" },
     description: input.description ?? safeDescription(input.type, input.entity),
     entity: input.entity,
+    schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
   });
   publishActivityEvent(event);
   return event;
