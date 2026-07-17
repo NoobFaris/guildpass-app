@@ -8,35 +8,30 @@ import {
 } from "@/lib/api-helpers";
 import { NotFoundError } from "@/lib/api-errors";
 import { mockMembers, type Member } from "@/lib/mock-data";
-import { requireDashboardSession, UnauthorizedError } from "@/lib/auth/server-session";
-import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { IntegrationClient } from "@guildpass/integration-client";
 import { getEnv, getApiMode } from "@/lib/env";
 import { getMemberRepository } from "@/lib/repositories/factory";
-import { getSessionStore } from "@/lib/auth/server-session";
+import { filterMembers, paginateItems, parseListLimit, parseListPage } from "@/lib/pagination";
+import type { MemberListQuery } from "@/lib/repositories/types";
 import {
   malformedPayloadError,
   validateMemberCreatePayload,
   validateMemberUpdatePayload,
 } from "@/lib/validation/mutations";
+import { recordDashboardActivity } from "@/lib/activity/dashboard";
+import { isMemberRole } from "@/lib/member-roles";
 
-/**
- * GET /api/members
- * Accessible to all authenticated roles (members:read).
- * In live mode: supports wallet and discordUserId lookups.
- * In mock mode: returns all members from configured repository.
- */
 export async function GET(request: Request): Promise<NextResponse> {
   return handleApiError(async () => {
     const apiMode = getApiMode();
 
-    // Allow live lookups by query: ?wallet=0x.. or ?discordUserId=123
     const url = new URL(request.url);
     const wallet = url.searchParams.get("wallet");
     const discordUserId = url.searchParams.get("discordUserId");
+    const query = parseMemberListQuery(request);
 
     if (apiMode === "live") {
-      // Allow injecting a test client via globalThis to avoid making real HTTP calls in tests
       const testClient = (globalThis as any).__TEST_INTEGRATION_CLIENT;
       const env = testClient ? null : getEnv();
       const client =
@@ -77,7 +72,6 @@ export async function GET(request: Request): Promise<NextResponse> {
           return apiResponse([mapped]);
         }
 
-        // We don't support listing all members via the core API here.
         return apiUnsupported(
           "members.list",
           apiMode,
@@ -89,35 +83,46 @@ export async function GET(request: Request): Promise<NextResponse> {
       }
     }
 
-    // Mock mode — return all members from configured repository
     try {
       const memberRepository = getMemberRepository();
-      return apiResponse(await memberRepository.getAll());
+      return apiResponse(await memberRepository.query(query));
     } catch (error) {
       console.error("Error fetching members:", error);
-      // Fallback to mock data on error
-      return apiResponse(mockMembers as Member[]);
+      return apiResponse(getFallbackMembers(query));
     }
   });
 }
 
-/**
- * POST /api/members
- * Requires members:write permission (invite / create a member).
- */
+const MEMBER_STATUSES: Member["status"][] = ["active", "inactive", "pending"];
+
+function parseMemberListQuery(request: Request): MemberListQuery {
+  const { searchParams } = new URL(request.url);
+  const status = searchParams.get("status");
+  const role = searchParams.get("role");
+
+  return {
+    search: searchParams.get("search") ?? undefined,
+    status: isMemberStatus(status) ? status : "all",
+    role: role && isMemberRole(role) ? role : "all",
+    limit: parseListLimit(searchParams.get("limit")),
+    page: parseListPage(searchParams.get("page")),
+    cursor: searchParams.get("cursor"),
+  };
+}
+
+function isMemberStatus(value: string | null): value is Member["status"] {
+  return value !== null && MEMBER_STATUSES.includes(value as Member["status"]);
+}
+
+function getFallbackMembers(query: MemberListQuery) {
+  const filtered = filterMembers(mockMembers, query);
+  return paginateItems(filtered, query);
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
-  try {
-    const session = await requireDashboardSession(request);
-    assertPermission(session, "members:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "members:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   return handleApiError(async () => {
     let body: unknown;
@@ -133,27 +138,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const memberRepository = getMemberRepository();
-    return await memberRepository.create(validation.data);
+    const created = await memberRepository.create(validation.data);
+    await recordDashboardActivity({
+      type: "member.joined",
+      entity: { type: "member", id: created.id, name: created.name },
+      actor: { id: session.userId, name: session.name },
+    });
+    return created;
   });
 }
 
-/**
- * PATCH /api/members?id=...
- * Requires members:write permission.
- */
 export async function PATCH(request: Request): Promise<NextResponse> {
-  try {
-    const session = await requireDashboardSession(request);
-    assertPermission(session, "members:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "members:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
@@ -178,48 +176,25 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     }
 
     const memberRepository = getMemberRepository();
-
-    // If the update changes the member's roles, invalidate their sessions
-    // so that stale access tokens reflect the new permissions within the
-    // bounded access-token lifetime (15 min).
-    if (validation.data.roles !== undefined) {
-      const existing = await memberRepository.getById(id);
-      if (existing) {
-        const oldRoles = (existing.roles ?? []).sort().join(",");
-        const newRoles = (validation.data.roles ?? []).sort().join(",");
-        if (oldRoles !== newRoles) {
-          // Invalidate all existing sessions for this member.
-          // In production, you'd map the member ID to a userId. For now,
-          // we invalidate by member ID directly.
-          const sessionStore = getSessionStore();
-          await sessionStore.invalidateUserSessions(id);
-        }
-      }
-    }
-
+    const existing = validation.data.roles ? await memberRepository.getById(id) : null;
     const updated = await memberRepository.update(id, validation.data);
     if (!updated) throw new NotFoundError("Member not found.");
+    const rolesChanged = existing && validation.data.roles && JSON.stringify(existing.roles) !== JSON.stringify(validation.data.roles);
+    if (rolesChanged) {
+      await recordDashboardActivity({
+        type: "member.roles_changed",
+        entity: { type: "member", id: updated.id, name: updated.name },
+        actor: { id: session.userId, name: session.name },
+      });
+    }
     return updated;
   });
 }
 
-/**
- * DELETE /api/members?id=...
- * Requires members:write permission (remove a member).
- */
 export async function DELETE(request: Request): Promise<NextResponse> {
-  try {
-    const session = await requireDashboardSession(request);
-    assertPermission(session, "members:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "members:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
@@ -232,8 +207,15 @@ export async function DELETE(request: Request): Promise<NextResponse> {
 
   return handleApiError(async () => {
     const memberRepository = getMemberRepository();
+    const member = await memberRepository.getById(id);
+    if (!member) throw new NotFoundError("Member not found.");
     const success = await memberRepository.delete(id);
     if (!success) throw new NotFoundError("Member not found.");
+    await recordDashboardActivity({
+      type: "member.left",
+      entity: { type: "member", id: member.id, name: member.name },
+      actor: { id: session.userId, name: session.name },
+    });
     return { success: true };
   });
 }

@@ -1,16 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type ActivityEvent } from "@guildpass/integration-client";
-import { type ActivityQuery } from "@/lib/activity/query";
+import { type ActivityEvent, CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
+import { connectActivityStream } from "@/lib/activity/client-stream";
+import { filterActivityEvents, type ActivityQuery } from "@/lib/activity/query";
+import { getActivityRefreshConfig } from "@/lib/env";
 import { type Activity, fetchActivity, generateMockActivity } from "@/lib/mock-data";
 
-const REFRESH_MS =
-  Number(process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS) || 15_000;
-
 interface UseActivityFeedOptions extends Omit<ActivityQuery, "cursor"> {
-  /** How many events to request per page. */
+  /** How many events to request per REST page. */
   limit?: number;
+  /** Override the fallback interval. Pass 0 to disable automatic delivery. */
+  refreshIntervalMs?: number;
   autoRefresh?: boolean;
   simulate?: boolean;
 }
@@ -20,6 +21,7 @@ interface UseActivityFeedResult {
   lastUpdated: Date | null;
   loading: boolean;
   loadingMore: boolean;
+  refreshing: boolean;
   hasMore: boolean;
   total: number;
   error: string | null;
@@ -46,11 +48,10 @@ function toActivityEvent(activity: Activity | ActivityEvent): ActivityEvent {
     type: TYPE_MAP[activity.type],
     source: "dashboard",
     severity: "info",
-    actor: {
-      name: activity.actor,
-    },
+    actor: { name: activity.actor },
     timestamp: activity.timestamp,
     description: activity.description,
+    schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
   };
 }
 
@@ -62,17 +63,25 @@ export function useActivityFeed({
   entityType,
   actor,
   from,
+  refreshIntervalMs,
   autoRefresh = true,
   simulate = true,
 }: UseActivityFeedOptions = {}): UseActivityFeedResult {
-  const [events, setEvents]             = useState<ActivityEvent[]>([]);
-  const [lastUpdated, setLastUpdated]   = useState<Date | null>(null);
-  const [loading, setLoading]           = useState(true);
-  const [loadingMore, setLoadingMore]   = useState(false);
-  const [nextCursor, setNextCursor]     = useState<string | null>(null);
-  const [total, setTotal]               = useState(0);
-  const [error, setError]               = useState<string | null>(null);
-  const seenIds                         = useRef(new Set<string>());
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const seenIds = useRef(new Set<string>());
+  const queryVersion = useRef(0);
+  const requestVersion = useRef(0);
+
+  const config = getActivityRefreshConfig();
+  const fallbackIntervalMs = refreshIntervalMs ?? config.intervalMs;
+  const maxEvents = config.maxEvents;
 
   const query = useMemo<ActivityQuery>(
     () => ({
@@ -90,105 +99,194 @@ export function useActivityFeed({
   const hasFilters = Boolean(type || source || severity || entityType || actor?.trim() || from);
 
   const replaceEvents = useCallback((incoming: ActivityEvent[]) => {
-    seenIds.current = new Set(incoming.map((event) => event.id));
-    setEvents(incoming);
+    setEvents((previous) => {
+      const byId = new Map(previous.map((event) => [event.id, event]));
+      incoming.forEach((event) => byId.set(event.id, event));
+      const bounded = [...byId.values()].sort(compareActivityEvents).slice(0, maxEvents);
+      seenIds.current = new Set(bounded.map((event) => event.id));
+      return bounded;
+    });
     setLastUpdated(new Date());
-  }, []);
+  }, [maxEvents]);
 
   const appendEvents = useCallback((incoming: ActivityEvent[]) => {
     const fresh = incoming.filter((event) => !seenIds.current.has(event.id));
     if (fresh.length === 0) return;
 
     fresh.forEach((event) => seenIds.current.add(event.id));
-    setEvents((previous) =>
-      [...previous, ...fresh].sort(compareActivityEvents)
-    );
+    setEvents((previous) => {
+      const bounded = [...previous, ...fresh]
+        .sort(compareActivityEvents)
+        .slice(0, maxEvents);
+      seenIds.current = new Set(bounded.map((event) => event.id));
+      return bounded;
+    });
     setLastUpdated(new Date());
-  }, []);
+  }, [maxEvents]);
 
   const prependLiveEvent = useCallback((event: ActivityEvent) => {
     if (seenIds.current.has(event.id)) return;
+    if (filterActivityEvents([event], query).events.length === 0) return;
 
     seenIds.current.add(event.id);
     setEvents((previous) => {
-      const merged = [event, ...previous].sort(compareActivityEvents);
-      return limit ? merged.slice(0, limit) : merged;
+      const bounded = [event, ...previous]
+        .sort(compareActivityEvents)
+        .slice(0, maxEvents);
+      seenIds.current = new Set(bounded.map((activity) => activity.id));
+      return bounded;
     });
+    setTotal((previous) => previous + 1);
     setLastUpdated(new Date());
-  }, [limit]);
+    setError(null);
+  }, [maxEvents, query]);
 
-  const refresh = useCallback(async () => {
+  const fetchLatest = useCallback(async ({ simulateEvent = true } = {}) => {
+    const version = queryVersion.current;
+    const currentRequest = requestVersion.current + 1;
+    requestVersion.current = currentRequest;
     try {
       const data = await fetchActivity(query);
-      replaceEvents(data.events.map(toActivityEvent));
+      if (
+        version !== queryVersion.current ||
+        currentRequest !== requestVersion.current
+      ) return;
+      const incoming = data.events.map(toActivityEvent);
+      replaceEvents(incoming);
       setNextCursor(data.nextCursor);
       setTotal(data.total);
       setError(null);
 
-      if (simulate && !hasFilters) {
+      if (simulateEvent && simulate && !hasFilters) {
         prependLiveEvent(toActivityEvent(generateMockActivity()));
       }
     } catch {
-      setError("Activity feed is temporarily unavailable.");
+      if (version === queryVersion.current) {
+        setError("Activity feed is temporarily unavailable.");
+      }
     } finally {
-      setLoading(false);
+      if (version === queryVersion.current) setLoading(false);
     }
   }, [hasFilters, prependLiveEvent, query, replaceEvents, simulate]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchLatest();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchLatest]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
 
+    const version = queryVersion.current;
     setLoadingMore(true);
     try {
       const data = await fetchActivity({ ...query, cursor: nextCursor });
+      if (version !== queryVersion.current) return;
       appendEvents(data.events.map(toActivityEvent));
       setNextCursor(data.nextCursor);
-      setTotal(data.total);
+      setTotal((previous) => Math.max(previous, data.total));
       setError(null);
     } catch {
-      setError("More activity could not be loaded.");
+      if (version === queryVersion.current) {
+        setError("More activity could not be loaded.");
+      }
     } finally {
-      setLoadingMore(false);
+      if (version === queryVersion.current) setLoadingMore(false);
     }
   }, [appendEvents, loadingMore, nextCursor, query]);
 
   useEffect(() => {
+    let disposed = false;
+    let pollingId: ReturnType<typeof setInterval> | null = null;
+    let reconciliationId: ReturnType<typeof setTimeout> | null = null;
+    let stopStream = () => {};
+
+    const pollWhenVisible = () => {
+      if (document.visibilityState === "visible") void fetchLatest();
+    };
+
+    const stopPolling = () => {
+      if (pollingId === null) return;
+      clearInterval(pollingId);
+      pollingId = null;
+      document.removeEventListener("visibilitychange", pollWhenVisible);
+    };
+
+    const startPolling = () => {
+      if (disposed || pollingId !== null || fallbackIntervalMs <= 0) return;
+      pollingId = setInterval(pollWhenVisible, fallbackIntervalMs);
+      document.addEventListener("visibilitychange", pollWhenVisible);
+    };
+
+    const scheduleReconciliation = () => {
+      reconciliationId = scheduleActivityReconciliation(
+        reconciliationId,
+        () => {
+          reconciliationId = null;
+          if (!disposed) void fetchLatest({ simulateEvent: false });
+        }
+      );
+    };
+
+    queryVersion.current += 1;
     seenIds.current.clear();
     setEvents([]);
     setNextCursor(null);
     setTotal(0);
     setLoading(true);
-    refresh();
+    setLoadingMore(false);
+    void fetchLatest();
 
-    const tick = () => {
-      // Pause polling while the tab is hidden to avoid wasted requests
-      if (document.visibilityState === "visible") refresh();
-    };
-
-    const id = autoRefresh ? setInterval(tick, REFRESH_MS) : null;
-    if (autoRefresh) {
-      document.addEventListener("visibilitychange", tick);
+    if (autoRefresh && fallbackIntervalMs > 0) {
+      if (typeof EventSource === "undefined") {
+        startPolling();
+      } else {
+        stopStream = connectActivityStream({
+          onEvent: (event) => {
+            prependLiveEvent(event);
+            scheduleReconciliation();
+          },
+          onFallback: startPolling,
+          onReady: () => {
+            void fetchLatest({ simulateEvent: false });
+          },
+        });
+      }
     }
 
     return () => {
-      if (id) clearInterval(id);
-      if (autoRefresh) {
-        document.removeEventListener("visibilitychange", tick);
-      }
+      disposed = true;
+      if (reconciliationId !== null) clearTimeout(reconciliationId);
+      stopStream();
+      stopPolling();
     };
-  }, [autoRefresh, refresh]);
+  }, [autoRefresh, fallbackIntervalMs, fetchLatest, prependLiveEvent]);
 
   return {
     events,
     lastUpdated,
     loading,
     loadingMore,
+    refreshing,
     hasMore: Boolean(nextCursor),
     total,
     error,
     loadMore,
     refresh,
   };
+}
+
+export function scheduleActivityReconciliation(
+  existingTimer: ReturnType<typeof setTimeout> | null,
+  reconcile: () => void,
+  delayMs = 50
+): ReturnType<typeof setTimeout> {
+  if (existingTimer !== null) clearTimeout(existingTimer);
+  return setTimeout(reconcile, delayMs);
 }
 
 function compareActivityEvents(a: ActivityEvent, b: ActivityEvent): number {

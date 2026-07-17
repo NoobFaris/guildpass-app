@@ -1,4 +1,4 @@
-import type { ActivityEvent } from "@guildpass/integration-client";
+import type { ActivityChange } from "@guildpass/integration-client";
 import type { ActivityQuery } from "./activity/query";
 import { readApiResult } from "./api-client";
 
@@ -38,6 +38,7 @@ export interface Activity {
   description: string;
   timestamp: string;
   actor: string;
+  changes?: ActivityChange[];
 }
 
 export const mockPasses: Pass[] = [
@@ -61,11 +62,11 @@ export const mockMembers: Member[] = [
 ];
 
 export const mockActivity: Activity[] = [
-  { id: "1", type: "member_joined", description: "Alice joined GuildPass DAO", timestamp: "2025-06-11T15:30:00Z", actor: "Alice" },
-  { id: "2", type: "pass_created", description: "Created new VIP Pass (draft)", timestamp: "2025-06-10T10:15:00Z", actor: "Admin" },
+  { id: "1", type: "member_joined", description: "Alice joined GuildPass DAO", timestamp: "2025-06-11T15:30:00Z", actor: "Alice", changes: [{ field: "name", before: undefined, after: "Alice" }, { field: "status", before: undefined, after: "active" }, { field: "roles", before: undefined, after: ["admin", "member"] }] },
+  { id: "2", type: "pass_created", description: "Created new VIP Pass (draft)", timestamp: "2025-06-10T10:15:00Z", actor: "Admin", changes: [{ field: "name", before: undefined, after: "VIP Pass" }, { field: "status", before: undefined, after: "draft" }] },
   { id: "3", type: "pass_purchased", description: "Bob purchased Premium Pass", timestamp: "2025-06-09T18:45:00Z", actor: "Bob" },
-  { id: "4", type: "role_changed", description: "Charlie promoted to Contributor", timestamp: "2025-06-08T09:20:00Z", actor: "Admin" },
-  { id: "5", type: "access_granted", description: "Alice granted Admin access", timestamp: "2025-06-07T14:00:00Z", actor: "Admin" },
+  { id: "4", type: "role_changed", description: "Charlie promoted to Contributor", timestamp: "2025-06-08T09:20:00Z", actor: "Admin", changes: [{ field: "roles", before: [], after: ["contributor"] }] },
+  { id: "5", type: "access_granted", description: "Alice granted Admin access", timestamp: "2025-06-07T14:00:00Z", actor: "Admin", changes: [{ field: "roles", before: ["member"], after: ["admin", "member"] }] },
 ];
 
 // ── Mock simulator ────────────────────────────────────────────────────────────
@@ -73,12 +74,12 @@ export const mockActivity: Activity[] = [
 // Used by useActivityFeed to simulate newly arriving events in dev/mock mode.
 
 const SIM_ACTORS = ["Alice", "Bob", "Charlie", "Diana", "Admin"];
-const SIM_TEMPLATES: { type: Activity["type"]; description: (actor: string) => string }[] = [
-  { type: "member_joined",  description: (a) => `${a} joined GuildPass DAO` },
+const SIM_TEMPLATES: { type: Activity["type"]; description: (actor: string) => string; changes?: ActivityChange[] }[] = [
+  { type: "member_joined",  description: (a) => `${a} joined GuildPass DAO`, changes: [{ field: "status", before: undefined, after: "active" }] },
   { type: "pass_purchased", description: (a) => `${a} purchased Community Pass` },
-  { type: "role_changed",   description: (a) => `${a} was promoted to Contributor` },
-  { type: "access_granted", description: (a) => `${a} granted access to Web3 Builders` },
-  { type: "pass_created",   description: (a) => `${a} created a new seasonal pass` },
+  { type: "role_changed",   description: (a) => `${a} was promoted to Contributor`, changes: [{ field: "roles", before: ["member"], after: ["member", "contributor"] }] },
+  { type: "access_granted", description: (a) => `${a} granted access to Web3 Builders`, changes: [{ field: "roles", before: [], after: ["member"] }] },
+  { type: "pass_created",   description: (a) => `${a} created a new seasonal pass`, changes: [{ field: "name", before: undefined, after: "Seasonal Pass" }] },
 ];
 
 let _simCounter = mockActivity.length;
@@ -93,6 +94,7 @@ export function generateMockActivity(): Activity {
     description: tpl.description(actor),
     timestamp:   new Date().toISOString(),
     actor,
+    changes:     tpl.changes,
   };
 }
 

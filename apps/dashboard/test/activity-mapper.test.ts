@@ -1,6 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert";
 import { mapWebhookToActivity } from "../lib/activity/mapper";
+import { CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 import type { WebhookPayload } from "../lib/activity/types";
 
 const CREATED = 1_700_000_000;
@@ -40,6 +41,7 @@ describe("mapWebhookToActivity", () => {
         name: "Alice",
       },
       metadata: data,
+      schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
     });
   });
 

@@ -2,6 +2,10 @@ import { mkdir, open, readFile, appendFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ActivityEvent } from "./types";
+import {
+  CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
+  upcastActivityEvents,
+} from "@guildpass/integration-client";
 import { ActivityQuery, ActivityQueryResult, filterActivityEvents } from "./query";
 import { type Activity, mockActivity } from "../mock-data";
 
@@ -50,6 +54,7 @@ function convertMockActivityToEvent(activity: Activity): ActivityEvent {
     },
     timestamp: activity.timestamp,
     description: activity.description,
+    schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
   };
 }
 
@@ -169,11 +174,12 @@ export class FileActivityStorage implements IActivityStorage {
 
     try {
       const file = await readFile(this.eventsPath, "utf8");
-      return file
+      const raws = file
         .split("\n")
         .filter(Boolean)
-        .map((line) => JSON.parse(line) as ActivityEvent)
+        .map((line) => JSON.parse(line))
         .reverse();
+      return upcastActivityEvents(raws);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return [];
@@ -187,11 +193,13 @@ export class FileActivityStorage implements IActivityStorage {
 
     try {
       const raw = await readFile(this.eventsPath, "utf8");
-      const events = raw
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as ActivityEvent)
-        .reverse();
+      const events = upcastActivityEvents(
+        raw
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => JSON.parse(line))
+          .reverse()
+      );
 
       return filterActivityEvents(events, query);
     } catch (error) {

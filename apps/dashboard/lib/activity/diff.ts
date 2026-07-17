@@ -1,77 +1,62 @@
 /**
- * lib/activity/diff.ts
+ * Field-level diffing for audit trail activity events.
  *
- * Pure utility for computing structured field-level diffs between two objects.
- * Used by the audit trail system (activity events) to record what changed
- * when entities are mutated.
- *
- * The returned diff is an array of ActivityChange objects, each describing
- * a single field that changed between `previous` and `current`.
- *
- * Sensitive fields (passwords, keys, etc.) are excluded from the diff.
- * Fields that exist in previous but not current are treated as removed.
- * Fields that exist in current but not previous are treated as added.
+ * Computes which top-level fields changed between two plain-object states,
+ * respecting the SENSITIVE_AUDIT_FIELDS blocklist so write-only secrets
+ * are never captured in any diff.
  */
 
-import type { ActivityChange } from "@guildpass/integration-client";
+import { type ActivityChange, SENSITIVE_AUDIT_FIELDS } from "@guildpass/integration-client";
 
 /**
- * Fields that should never appear in an audit diff.
- * When adding new secrets to entities, append their field names here.
- */
-const SENSITIVE_FIELDS = new Set([
-  "password",
-  "apiKey",
-  "privateKey",
-  "secret",
-  "token",
-  "webhookSecret",
-]);
-
-/**
- * Compute the difference between two object snapshots.
+ * Produce a structured before/after diff between `previous` and `next`.
  *
- * @param previous - The object state before the mutation.
- * @param current  - The object state after the mutation.
- * @returns An array of ActivityChange objects, one per changed field.
- *          Returns an empty array if the objects are deeply equal.
- *
- * @example
- *   const prev = { name: "Old", count: 5 };
- *   const curr = { name: "New", count: 10 };
- *   computeDiff(prev, curr);
- *   // [
- *   //   { field: "name",  before: "Old", after: "New" },
- *   //   { field: "count", before: 5,     after: 10 },
- *   // ]
+ * Rules:
+ * - Only top-level own properties are compared (no deep traversal).
+ * - Fields listed in SENSITIVE_AUDIT_FIELDS are unconditionally excluded.
+ * - Fields unchanged between `previous` and `next` are omitted.
+ * - `undefined` is treated as "absent" — adding or removing a field is recorded.
  */
-export function computeDiff(
-  previous: Record<string, unknown>,
-  current: Record<string, unknown>,
+export function computeDiff<T extends Record<string, unknown>>(
+  previous: T,
+  next: T,
 ): ActivityChange[] {
-  // Collect all unique keys from both objects
-  const allKeys = new Set([
-    ...Object.keys(previous),
-    ...Object.keys(current),
-  ]);
-
   const changes: ActivityChange[] = [];
+  const allFields = new Set([...Object.keys(previous), ...Object.keys(next)]);
 
-  for (const key of allKeys) {
-    // Never expose sensitive fields in audit diffs
-    if (SENSITIVE_FIELDS.has(key)) continue;
+  for (const field of allFields) {
+    // Hard block: never diff a sensitive field
+    if (SENSITIVE_AUDIT_FIELDS.has(field)) {
+      continue;
+    }
 
-    const before = previous[key];
-    const after = current[key];
+    const before = previous[field];
+    const after = next[field];
 
-    // Skip unchanged fields (shallow equality is sufficient for primitive counters)
-    if (before === after) continue;
+    if (isEqual(before, after)) {
+      continue;
+    }
 
-    // Both undefined after sensitive-field skip? Skip.
-    if (before === undefined && after === undefined) continue;
-
-    changes.push({ field: key, before, after });
+    changes.push({ field, before, after });
   }
 
   return changes;
+}
+
+/**
+ * Shallow equality check that treats undefined and missing as equivalent.
+ */
+function isEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+
+  // Treat `undefined` and missing keys the same
+  if (a === undefined && b === undefined) return true;
+
+  // Compare arrays element-wise
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    return a.every((item, index) => isEqual(item, b[index]));
+  }
+
+  return false;
 }

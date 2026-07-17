@@ -2,9 +2,13 @@ import { NextResponse } from "next/server";
 import { apiError, apiResponse, apiValidationError } from "@/lib/api-helpers";
 import { filterActivityEvents, parseActivityQuery } from "@/lib/activity/query";
 import { activityStorage } from "@/lib/activity/storage";
+import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { getActivityRepository } from "@/lib/repositories/factory";
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const guard = requireSessionAndPermission(request, "activity:read");
+  if (!guard.ok) return guard.response;
+
   const url = new URL(request.url);
   const parsed = parseActivityQuery(url.searchParams);
 

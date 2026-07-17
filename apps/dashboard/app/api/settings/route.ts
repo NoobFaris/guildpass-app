@@ -1,40 +1,24 @@
 import { NextResponse } from "next/server";
-import { apiError, apiValidationError, handleApiError } from "@/lib/api-helpers";
-import { requireDashboardSession, UnauthorizedError } from "@/lib/auth/server-session";
-import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { apiValidationError, handleApiError } from "@/lib/api-helpers";
+import { MOCK_API_SESSION } from "@/lib/auth/session";
+import { guardPermission, requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { getSettingsRepository } from "@/lib/repositories/factory";
 import { validateSettingsPatch } from "@/lib/validation/settings";
+import { recordDashboardActivity } from "@/lib/activity/dashboard";
 
-/**
- * GET /api/settings
- * Returns the typed workspace settings. Requires settings:read (held by every
- * role, including readonly), so the page can hydrate its initial values.
- *
- * PATCH /api/settings
- * Validates and persists supported settings. Requires settings:write.
- *
- * ⚠️  In production, resolve the session from the request (JWT / cookie)
- *     instead of using MOCK_API_SESSION, then assertPermission against it.
- */
 export async function GET(): Promise<NextResponse> {
+  const guard = guardPermission(MOCK_API_SESSION, "settings:read");
+  if (!guard.ok) return guard.response;
+
   return handleApiError(async () => {
     return await getSettingsRepository().get();
   });
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  try {
-    const session = await requireDashboardSession(request);
-    assertPermission(session, "settings:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "settings:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   let body: unknown;
   try {
@@ -45,12 +29,18 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     ]);
   }
 
-  const result = validateSettingsPatch(body);
-  if (!result.ok) {
-    return apiValidationError("Invalid settings", result.errors);
+  const validation = validateSettingsPatch(body);
+  if (!validation.ok) {
+    return apiValidationError("Invalid settings", validation.errors);
   }
 
   return handleApiError(async () => {
-    return await getSettingsRepository().update(result.value);
+    const updated = await getSettingsRepository().update(validation.value);
+    await recordDashboardActivity({
+      type: "settings.updated",
+      actor: { id: session.userId, name: session.name },
+      description: "Dashboard settings updated",
+    });
+    return updated;
   });
 }

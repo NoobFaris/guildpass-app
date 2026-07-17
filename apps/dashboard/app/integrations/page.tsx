@@ -1,6 +1,9 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import { MOCK_API_SESSION } from "@/lib/auth/session";
+import { getServerComponentSession } from "@/lib/auth/server-session";
 import { getIntegrationsList, IntegrationStatus } from "@/lib/integrations";
+import AccessDenied from "@/components/AccessDenied";
+import { hasRole } from "@/lib/permissions";
+import { formatRelativeTime } from "@/lib/format-relative-time";
 
 const StatusBadge = ({ status }: { status: IntegrationStatus }) => {
   const styles: Record<IntegrationStatus, string> = {
@@ -27,10 +30,25 @@ const StatusBadge = ({ status }: { status: IntegrationStatus }) => {
 };
 
 export default async function IntegrationsPage() {
+  // 1. Fetch the actual session dynamically instead of using the hardcoded mock
+  const session = await getServerComponentSession();
+
+  // 2. Enforce the hard boundary: only Owners and Admins can view integrations
+  const canAccessIntegrations = hasRole(session, ["owner", "admin"]);
+
+  if (!canAccessIntegrations) {
+    return (
+      <DashboardLayout title="Integrations" session={session}>
+        <AccessDenied requiredPermission="Role: owner or admin" currentRole={session.role} />
+      </DashboardLayout>
+    );
+  }
+
+  // 3. Authorized users proceed to load the data
   const integrations = await getIntegrationsList();
 
   return (
-    <DashboardLayout title="Integrations" session={MOCK_API_SESSION}>
+    <DashboardLayout title="Integrations" session={session}>
       <div className="max-w-4xl">
         <div className="mb-8">
           <p className="text-slate-600">
@@ -54,7 +72,7 @@ export default async function IntegrationsPage() {
                       <StatusBadge status={integration.status} />
                     </div>
                     <p className="text-slate-600 text-sm mb-4">{integration.description}</p>
-                    
+
                     <div className="bg-slate-50 rounded-lg p-4 text-sm border border-slate-100">
                       <p className="font-medium text-slate-800 mb-1">Status Details</p>
                       <p className="text-slate-600">{integration.message}</p>
@@ -62,11 +80,11 @@ export default async function IntegrationsPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
                 <span>Adapter Strategy: {integration.details?.strategy || integration.details?.mode || "N/A"}</span>
                 {integration.lastChecked && (
-                  <span>Last Checked: {new Date(integration.lastChecked).toLocaleString()}</span>
+                  <span>Last Checked: {formatRelativeTime(integration.lastChecked)}</span>
                 )}
               </div>
             </div>

@@ -37,8 +37,10 @@ export type ActivityEventType =
   | "member.roles_changed"
   | "access.granted"
   | "access.revoked"
+  | "settings.updated"
   | "verification.completed"
-  | "webhook.received";
+  | "webhook.received"
+  | "activity.permission_denied";
 
 export type ActivityEventSource = "dashboard" | "webhook" | "core_api";
 
@@ -49,6 +51,12 @@ export type ActivityEventEntity = {
   id: string;
   name?: string;
 };
+
+/**
+ * The current schema version for ActivityEvent.
+ * Bump this when adding/removing/renaming fields on ActivityEvent.
+ */
+export const CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION = 2;
 
 export type ActivityEvent = {
   id: string;
@@ -64,4 +72,9 @@ export type ActivityEvent = {
   description: string;
   entity?: ActivityEventEntity;
   metadata?: Record<string, any>;
+  /**
+   * Explicit schema version for backward-compatible migration.
+   * Legacy events stored without this field are treated as version 1.
+   */
+  schemaVersion: number;
 };
