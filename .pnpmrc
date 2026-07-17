@@ -1,0 +1,7 @@
+ignore-scripts=false
+strict-peer-dependencies=false
+auto-install-peers=true
+allow-scripts=*
+verify-lockfile=false
+enable-pre-post-scripts=false
+ignore-deprecations=true

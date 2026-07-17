@@ -1,0 +1,46 @@
+{
+  "name": "guildpass-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GuildPass web app dashboard for managing passes, communities, and members",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm --filter @guildpass/dashboard dev",
+    "build": "pnpm --filter @guildpass/dashboard build",
+    "start": "pnpm --filter @guildpass/dashboard start",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:webhook-utils": "pnpm --filter @guildpass/webhook-utils test",
+    "dev:bot": "pnpm --filter @guildpass/discord-bot dev",
+    "start:bot": "pnpm --filter @guildpass/discord-bot start",
+    "register:commands": "pnpm --filter @guildpass/discord-bot register:commands",
+    "dev:docs": "pnpm --filter @guildpass/docs start",
+    "build:docs": "pnpm --filter @guildpass/docs build"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Adamantine-guild/guildpass-app.git"
+  },
+  "homepage": "https://github.com/Adamantine-guild/guildpass-app",
+  "bugs": {
+    "url": "https://github.com/Adamantine-guild/guildpass-app/issues"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.5.0",
+    "typescript-eslint": "^8.61.0"
+  },
+  "dependencies": {
+    "tsx": "^4.22.4",
+    "zod": "^4.4.3"
+  }
+}

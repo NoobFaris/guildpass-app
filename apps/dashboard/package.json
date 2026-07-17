@@ -1,0 +1,46 @@
+{
+  "name": "@guildpass/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GuildPass web dashboard for managing passes, guilds, members, and activity",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "tsx --test test/**/*.test.ts",
+    "test:js": "node --test test/**/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Adamantine-guild/guildpass-app.git",
+    "directory": "apps/dashboard"
+  },
+  "homepage": "https://github.com/Adamantine-guild/guildpass-app/tree/main/apps/dashboard",
+  "bugs": {
+    "url": "https://github.com/Adamantine-guild/guildpass-app/issues"
+  },
+  "dependencies": {
+    "@guildpass/integration-client": "workspace:*",
+    "@guildpass/webhook-utils": "workspace:*",
+    "next": "14.2.21",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.6",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18.17.0"
+  }
+}

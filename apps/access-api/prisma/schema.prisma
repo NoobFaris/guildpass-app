@@ -1,0 +1,112 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model ProcessedEvent {
+  id              String   @id @default(uuid())
+  contractAddress String
+  blockHash       String
+  blockNumber     BigInt
+  transactionHash String
+  logIndex        Int
+  status          String   @default("processed") // e.g., processed, reverted
+  eventType       String
+  data            Json
+  fencingToken    Int      @default(0) // Monotonically increasing leader generation
+  createdAt       DateTime @default(now())
+
+  @@unique([contractAddress, transactionHash, logIndex])
+  @@index([contractAddress])
+  @@index([blockNumber])
+  @@index([blockHash])
+}
+
+
+model Membership {
+  id        String   @id @default(uuid())
+  wallet    String
+  passId    BigInt
+  status    Int
+  updatedAt DateTime @updatedAt
+
+  @@unique([wallet, passId])
+}
+
+model IndexerCheckpoint {
+  contractAddress String   @id
+  lastBlock        BigInt
+  fencingToken     Int      @default(0) // Monotonically increasing leader generation
+  updatedAt        DateTime @updatedAt
+}
+
+
+/// Advisory lock used to coordinate the live indexer and the backfill CLI.
+/// holder is either "live-indexer" or "backfill".
+model BackfillLock {
+  holder      String    @id            // "live-indexer" | "backfill"
+  acquiredAt  DateTime
+  liveHead    BigInt?                  // current chain head (live-indexer only)
+  updatedAt   DateTime  @updatedAt
+}
+
+/// Singleton row (id = "singleton") used for distributed leader election
+/// across horizontally-scaled indexer instances.
+model LeaderElection {
+  id                String   @id @default("singleton")
+  leaderInstanceId  String   @default("") // Unique instance ID of the current leader
+  generation        Int      @default(0)  // Monotonically increasing fencing token
+  leaseExpiresAt    DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+model Guild {
+  id                String             @id @default(uuid())
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  // Relations
+  passes            Pass[]
+  members           Member[]
+  dashboardSettings DashboardSettings?
+}
+
+model Pass {
+  id        String   @id @default(uuid())
+  guildId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign key relation to Guild with Cascade delete
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model Member {
+  id        String   @id @default(uuid())
+  guildId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Foreign key relation to Guild with Cascade delete
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
+
+model ActivityEvent {
+  id        String   @id @default(uuid())
+  eventType String
+  data      Json
+  createdAt DateTime @default(now())
+}
+
+model DashboardSettings {
+  id        String   @id @default(uuid())
+  guildId   String   @unique // Ensures the strict 1-to-1 relationship constraint
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 1-to-1 relation to Guild with Cascade delete
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+}
