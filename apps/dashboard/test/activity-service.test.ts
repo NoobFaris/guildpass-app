@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { activityService } from "../lib/data/activity-service.ts";
+import { activityService } from "../lib/data/activity-service";
 
 /**
  * activity-service.test.ts

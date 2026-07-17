@@ -24,6 +24,7 @@ const EVENT_TYPES = new Set<ActivityEventType>([
   "access.revoked",
   "verification.completed",
   "webhook.received",
+  "activity.permission_denied",
 ]);
 
 const EVENT_SOURCES = new Set<ActivityEventSource>([

@@ -55,6 +55,58 @@ test("Repository Factory: MockPassRepository", async () => {
   assert.strictEqual(notFound, null, "Deleted pass should not be found");
 });
 
+test("Repository Factory: MockPassRepository returns consistent pagination at boundaries", async () => {
+  clearRepositories();
+
+  const repo = getPassRepository();
+
+  const outOfRangePage = await repo.query({ limit: 2, page: 3 });
+  assert.deepStrictEqual(
+    {
+      itemIds: outOfRangePage.items.map((pass) => pass.id),
+      total: outOfRangePage.total,
+      limit: outOfRangePage.limit,
+      page: outOfRangePage.page,
+      nextCursor: outOfRangePage.nextCursor,
+      hasNextPage: outOfRangePage.hasNextPage,
+      hasPreviousPage: outOfRangePage.hasPreviousPage,
+    },
+    {
+      itemIds: [],
+      total: 4,
+      limit: 2,
+      page: 3,
+      nextCursor: null,
+      hasNextPage: false,
+      hasPreviousPage: true,
+    },
+    "Out-of-range pass pages should keep pagination metadata consistent"
+  );
+
+  const oversizedLimit = await repo.query({ limit: 99, page: 1 });
+  assert.deepStrictEqual(
+    {
+      itemIds: oversizedLimit.items.map((pass) => pass.id),
+      total: oversizedLimit.total,
+      limit: oversizedLimit.limit,
+      page: oversizedLimit.page,
+      nextCursor: oversizedLimit.nextCursor,
+      hasNextPage: oversizedLimit.hasNextPage,
+      hasPreviousPage: oversizedLimit.hasPreviousPage,
+    },
+    {
+      itemIds: ["1", "2", "3", "4"],
+      total: 4,
+      limit: 50,
+      page: 1,
+      nextCursor: null,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+    "Oversized pass limits should be clamped while returning all available matches"
+  );
+});
+
 test("Repository Factory: MockGuildRepository", async () => {
   clearRepositories();
 
@@ -111,6 +163,35 @@ test("Repository Factory: MockMemberRepository", async () => {
   // Wallet index should still work after update
   const stillFound = await repo.getByWallet("0x999zzz");
   assert.ok(stillFound, "Member should still be findable by wallet after update");
+});
+
+test("Repository Factory: MockMemberRepository returns consistent pagination for zero-match searches", async () => {
+  clearRepositories();
+
+  const repo = getMemberRepository();
+  const result = await repo.query({ search: "no-such-wallet", limit: 2, page: 1 });
+
+  assert.deepStrictEqual(
+    {
+      items: result.items,
+      total: result.total,
+      limit: result.limit,
+      page: result.page,
+      nextCursor: result.nextCursor,
+      hasNextPage: result.hasNextPage,
+      hasPreviousPage: result.hasPreviousPage,
+    },
+    {
+      items: [],
+      total: 0,
+      limit: 2,
+      page: 1,
+      nextCursor: null,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    },
+    "Zero-match member searches should return an empty, well-formed paginated result"
+  );
 });
 
 test("Repository Factory: MockActivityRepository", async () => {

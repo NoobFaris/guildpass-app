@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "test": "tsx --test test/**/*.test.ts"
+    "test": "tsx --test test/**/*.test.ts",
+    "backfill": "tsx scripts/backfill.ts"
   },
   "dependencies": {
     "@guildpass/contracts": "workspace:*",
