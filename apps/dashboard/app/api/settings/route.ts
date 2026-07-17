@@ -1,21 +1,14 @@
 import { NextResponse } from "next/server";
-import { apiError, apiValidationError, handleApiError } from "@/lib/api-helpers";
+import { apiValidationError, handleApiError } from "@/lib/api-helpers";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
-import { requireDashboardSession, UnauthorizedError } from "@/lib/auth/server-session";
-import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { guardPermission, requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { getSettingsRepository } from "@/lib/repositories/factory";
 import { validateSettingsPatch } from "@/lib/validation/settings";
 import { recordDashboardActivity } from "@/lib/activity/dashboard";
 
 export async function GET(): Promise<NextResponse> {
-  try {
-    assertPermission(MOCK_API_SESSION, "settings:read");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    throw err;
-  }
+  const guard = guardPermission(MOCK_API_SESSION, "settings:read");
+  if (!guard.ok) return guard.response;
 
   return handleApiError(async () => {
     return await getSettingsRepository().get();
@@ -23,19 +16,9 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  let session;
-  try {
-    session = requireDashboardSession(request);
-    assertPermission(session, "settings:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "settings:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   let body: unknown;
   try {
@@ -55,7 +38,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const updated = await getSettingsRepository().update(validation.value);
     await recordDashboardActivity({
       type: "settings.updated",
-      actor: { id: session!.userId, name: session!.name },
+      actor: { id: session.userId, name: session.name },
       description: "Dashboard settings updated",
     });
     return updated;

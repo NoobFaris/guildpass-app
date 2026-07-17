@@ -9,6 +9,7 @@ interface DashboardActivityInput {
   actor?: { id?: string; name?: string; wallet?: string };
   description?: string;
   severity?: ActivityEventSeverity;
+  metadata?: Record<string, any>;
 }
 
 function safeDescription(type: ActivityEventType, entity?: ActivityEventEntity): string {
@@ -54,6 +55,7 @@ export async function recordDashboardActivity(
     actor: input.actor ?? { name: "Admin" },
     description: input.description ?? safeDescription(input.type, input.entity),
     entity: input.entity,
+    metadata: input.metadata,
   });
   publishActivityEvent(event);
   return event;

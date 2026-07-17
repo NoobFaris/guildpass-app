@@ -39,7 +39,8 @@ export type ActivityEventType =
   | "access.revoked"
   | "settings.updated"
   | "verification.completed"
-  | "webhook.received";
+  | "webhook.received"
+  | "activity.permission_denied";
 
 export type ActivityEventSource = "dashboard" | "webhook" | "core_api";
 

@@ -27,6 +27,7 @@ const TYPE_ICON: Record<ActivityEventType, string> = {
   "settings.updated": "⚙️",
   "verification.completed": "✅",
   "webhook.received": "📡",
+  "activity.permission_denied": "⛔",
 };
 
 const TYPE_COLOR: Record<ActivityEventType, string> = {
@@ -45,6 +46,7 @@ const TYPE_COLOR: Record<ActivityEventType, string> = {
   "settings.updated": "bg-slate-100",
   "verification.completed": "bg-emerald-100",
   "webhook.received": "bg-indigo-100",
+  "activity.permission_denied": "bg-red-100",
 };
 
 const TYPE_FILTERS: { label: string; value: ActivityEventType | "" }[] = [
@@ -55,6 +57,7 @@ const TYPE_FILTERS: { label: string; value: ActivityEventType | "" }[] = [
   { label: "Pass purchased", value: "pass.purchased" },
   { label: "Access granted", value: "access.granted" },
   { label: "Webhook received", value: "webhook.received" },
+  { label: "Permission denied", value: "activity.permission_denied" },
 ];
 
 const SOURCE_FILTERS: { label: string; value: ActivityEventSource | "" }[] = [

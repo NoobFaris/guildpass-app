@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import {
-  apiError,
   apiUnsupported,
   apiValidationError,
   handleApiError,
 } from "@/lib/api-helpers";
 import type { ApiFieldError } from "@/lib/api-contracts";
 import { mockGuilds, type Guild } from "@/lib/mock-data";
-import { requireDashboardSession, UnauthorizedError } from "@/lib/auth/server-session";
-import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { getApiMode } from "@/lib/env";
 import { getGuildRepository } from "@/lib/repositories/factory";
 import { recordDashboardActivity } from "@/lib/activity/dashboard";
@@ -36,19 +34,9 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  let session;
-  try {
-    session = requireDashboardSession(request);
-    assertPermission(session, "guilds:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "guilds:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   return handleApiError(async () => {
     const body = await request.json();
@@ -67,26 +55,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     await recordDashboardActivity({
       type: "guild.created",
       entity: { type: "guild", id: created.id, name: created.name },
-      actor: { id: session!.userId, name: session!.name },
+      actor: { id: session.userId, name: session.name },
     });
     return created;
   });
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  let session;
-  try {
-    session = requireDashboardSession(request);
-    assertPermission(session, "guilds:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "guilds:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
@@ -105,26 +83,16 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     await recordDashboardActivity({
       type: "guild.updated",
       entity: { type: "guild", id: updated.id, name: updated.name },
-      actor: { id: session!.userId, name: session!.name },
+      actor: { id: session.userId, name: session.name },
     });
     return updated;
   });
 }
 
 export async function DELETE(request: Request): Promise<NextResponse> {
-  let session;
-  try {
-    session = requireDashboardSession(request);
-    assertPermission(session, "guilds:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "guilds:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
@@ -144,7 +112,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     await recordDashboardActivity({
       type: "guild.deleted",
       entity: { type: "guild", id: guild.id, name: guild.name },
-      actor: { id: session!.userId, name: session!.name },
+      actor: { id: session.userId, name: session.name },
     });
     return { success: true };
   });

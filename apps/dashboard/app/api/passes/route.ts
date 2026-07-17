@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import {
-  apiError,
   apiUnsupported,
   apiValidationError,
   handleApiError,
 } from "@/lib/api-helpers";
 import { NotFoundError } from "@/lib/api-errors";
 import { mockPasses, type Pass } from "@/lib/mock-data";
-import { requireDashboardSession, UnauthorizedError } from "@/lib/auth/server-session";
-import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { getApiMode } from "@/lib/env";
 import { getPassRepository } from "@/lib/repositories/factory";
 import type { PassListQuery } from "@/lib/repositories/types";
@@ -70,19 +68,9 @@ function getFallbackPasses(query: PassListQuery) {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  let session;
-  try {
-    session = requireDashboardSession(request);
-    assertPermission(session, "passes:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "passes:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   return handleApiError(async () => {
     let body: unknown;
@@ -102,26 +90,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     await recordDashboardActivity({
       type: "pass.created",
       entity: { type: "pass", id: created.id, name: created.name },
-      actor: { id: session!.userId, name: session!.name },
+      actor: { id: session.userId, name: session.name },
     });
     return created;
   });
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  let session;
-  try {
-    session = requireDashboardSession(request);
-    assertPermission(session, "passes:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "passes:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
@@ -151,26 +129,16 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     await recordDashboardActivity({
       type: "pass.updated",
       entity: { type: "pass", id: updated.id, name: updated.name },
-      actor: { id: session!.userId, name: session!.name },
+      actor: { id: session.userId, name: session.name },
     });
     return updated;
   });
 }
 
 export async function DELETE(request: Request): Promise<NextResponse> {
-  let session;
-  try {
-    session = requireDashboardSession(request);
-    assertPermission(session, "passes:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    if (err instanceof UnauthorizedError) {
-      return apiError(err.message, 401);
-    }
-    throw err;
-  }
+  const guard = requireSessionAndPermission(request, "passes:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
@@ -190,7 +158,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     await recordDashboardActivity({
       type: "pass.deleted",
       entity: { type: "pass", id: pass.id, name: pass.name },
-      actor: { id: session!.userId, name: session!.name },
+      actor: { id: session.userId, name: session.name },
     });
     return { success: true };
   });
