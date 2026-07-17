@@ -105,10 +105,11 @@ class TestableIndexerCore extends IndexerCore {
     super(
       {
         rpcUrl: "http://localhost:8545",
-        contractAddress: "0x0000000000000000000000000000000000000000",
+        contractAddresses: ["0x0000000000000000000000000000000000000000"],
         confirmationDepth: 10,
         startBlock: 0n,
       },
+
       makePrisma(dbOverrides) // inject mock Prisma
     );
     this._viemClient = viemClient;
@@ -299,9 +300,15 @@ describe("IndexerCore.processRange()", () => {
       alreadyProcessed: false,
     });
 
-    const result = await core.processRange({ fromBlock: 100n, toBlock: 100n, dryRun: true });
+    const result = await core.processRange({
+      contractAddress: "0x0000000000000000000000000000000000000000" as any,
+      fromBlock: 100n,
+      toBlock: 100n,
+      dryRun: true,
+    });
 
     assert.equal(processLogCalled, false, "processLog must not be called in dry-run");
+
     assert.equal(result.dryRun, true);
     assert.equal(result.logsFound, 1);
     assert.equal(result.logsApplied, 1);
@@ -325,7 +332,13 @@ describe("IndexerCore.processRange()", () => {
       alreadyProcessed: true,
     });
 
-    const result = await core.processRange({ fromBlock: 100n, toBlock: 100n, dryRun: true });
+    const result = await core.processRange({
+      contractAddress: "0x0000000000000000000000000000000000000000" as any,
+      fromBlock: 100n,
+      toBlock: 100n,
+      dryRun: true,
+    });
+
 
     assert.equal(result.logsApplied, 0);
     assert.equal(result.logsSkipped, 1);
