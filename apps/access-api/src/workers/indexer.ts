@@ -1,87 +1,69 @@
 import {
   createPublicClient,
-http,
-decodeEventLog,
-type Address,
-type PublicClient,
-type Log,
+  http,
+  decodeEventLog,
+  type Address,
+  type PublicClient,
+  type Log,
 } from "viem";
 import { mainnet } from "viem/chains";
 import { PrismaClient } from "@prisma/client";
 import { MEMBERSHIP_ABI, MEMBERSHIP_EVENTS } from "@guildpass/contracts";
-import { LeaderElectionService, FencingTokenError } from "../utils/leader-election.js";
-import { indexerLagBlocks, indexerPollCount } from "@guildpass/metrics";
 
 export interface IndexerConfig {
-rpcUrl: string;
-contractAddresses: Address[];
-confirmationDepth: number;
-startBlock: bigint;
+  rpcUrl: string;
+  contractAddresses?: Address[];
+  contractAddress?: Address; // Added to support single-address test configurations
+  confirmationDepth: number;
+  startBlock: bigint;
 }
 
 // ─── Types shared between the live indexer and the backfill CLI ───────────────
 
 /** Lightweight summary of one applied event, used by dry-run mode. */
 export interface ProcessedLogSummary {
-transactionHash: string;
-logIndex: number;
-blockNumber: bigint;
-blockHash: string;
-eventType: string;
-args: Record<string, unknown>;
-/** Whether the record already exists (idempotent re-application). */
-alreadyProcessed: boolean;
+  transactionHash: string;
+  logIndex: number;
+  blockNumber: bigint;
+  blockHash: string;
+  eventType: string;
+  args: Record<string, unknown>;
+  /** Whether the record already exists (idempotent re-application). */
+  alreadyProcessed: boolean;
 }
 
 /** Options passed to the shared processRange() method. */
 export interface ProcessRangeOptions {
-  contractAddress: Address;
+  contractAddress?: Address; // Changed from required to optional
   fromBlock: bigint;
   toBlock: bigint;
-  /**
-   * When true, the method collects and returns what would change without
-   * writing anything to the database.
-   */
   dryRun?: boolean;
-  /**
-   * Current leader generation (fencing token). All writes within this
-   * range will be stamped with this token to prevent split-brain corruption.
-   */
-  fencingToken?: number;
-contractAddress: Address;
-fromBlock: bigint;
-toBlock: bigint;
-/**
-* When true, the method collects and returns what would change without
-* writing anything to the database.
-*/
-dryRun?: boolean;
 }
 
 /** Result returned by processRange(). */
 export interface ProcessRangeResult {
-fromBlock: bigint;
-toBlock: bigint;
-logsFound: number;
-logsApplied: number;
-logsSkipped: number;
-dryRun: boolean;
-/** Populated only in dry-run mode – one entry per log that would be applied. */
-preview: ProcessedLogSummary[];
+  fromBlock: bigint;
+  toBlock: bigint;
+  logsFound: number;
+  logsApplied: number;
+  logsSkipped: number;
+  dryRun: boolean;
+  /** Populated only in dry-run mode – one entry per log that would be applied. */
+  preview: ProcessedLogSummary[];
 }
 
 // ─── Core: reusable processing engine ─────────────────────────────────────────
 
 /**
-* IndexerCore owns the stateless event-processing logic so it can be called
-* by both the continuous live indexer (poll loop) and the one-shot backfill CLI.
-*/
+ * IndexerCore owns the stateless event-processing logic so it can be called
+ * by both the continuous live indexer (poll loop) and the one-shot backfill CLI.
+ */
 export class IndexerCore {
-private client: PublicClient;
-protected config: IndexerConfig;
-protected db: PrismaClient;
+  private client: PublicClient;
+  protected config: IndexerConfig;
+  protected db: PrismaClient;
 
-constructor(config: IndexerConfig, db?: PrismaClient) {
+  constructor(config: IndexerConfig, db?: PrismaClient) {
     this.config = config;
     this.db = db ?? new PrismaClient();
     this.client = createPublicClient({
@@ -98,7 +80,16 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
    * Fetch and process (or preview) all logs for one contract in [fromBlock, toBlock].
    */
   async processRange(opts: ProcessRangeOptions): Promise<ProcessRangeResult> {
-    const { contractAddress, fromBlock, toBlock, dryRun = false } = opts;
+    const { 
+      contractAddress = this.config.contractAddress || this.config.contractAddresses?.[0], 
+      fromBlock, 
+      toBlock, 
+      dryRun = false 
+    } = opts;
+
+    if (!contractAddress) {
+      throw new Error("No contract address provided for processRange");
+    }
 
     const logs = await this.getClient().getLogs({
       address: contractAddress,
@@ -125,7 +116,7 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
           else result.logsSkipped++;
         }
       } else {
-        const applied = await this.processLog(contractAddress, log, opts.fencingToken);
+        const applied = await this.processLog(contractAddress, log);
         if (applied) result.logsApplied++;
         else result.logsSkipped++;
       }
@@ -150,14 +141,13 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
 
       const existing = await this.db.processedEvent.findUnique({
         where: {
-          transactionHash_logIndex_contractAddress: {
+          contractAddress_transactionHash_logIndex: {
+            contractAddress,
             transactionHash,
             logIndex,
-            contractAddress,
           },
         },
       });
-
       const alreadyProcessed =
         existing?.status === "processed" && existing.blockHash === blockHash;
 
@@ -175,20 +165,16 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
     }
   }
 
-  async processLog(
-    contractAddress: Address,
-    log: Log,
-    fencingToken?: number,
-  ): Promise<boolean> {
+  public async processLog(contractAddress: Address, log: Log): Promise<boolean> {
     const { transactionHash, logIndex, blockHash, blockNumber } = log;
     if (!transactionHash || logIndex === null || !blockHash || blockNumber === null) return false;
 
     const existing = await this.db.processedEvent.findUnique({
       where: {
-        transactionHash_logIndex_contractAddress: {
+        contractAddress_transactionHash_logIndex: {
+          contractAddress,
           transactionHash,
           logIndex,
-          contractAddress,
         },
       },
     });
@@ -206,10 +192,10 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
       }
     }
 
-    const token = fencingToken ?? 0;
+    let decoded: any = null;
 
     try {
-      const decoded = decodeEventLog({
+      decoded = decodeEventLog({
         abi: MEMBERSHIP_ABI,
         data: log.data,
         topics: log.topics,
@@ -220,10 +206,10 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
 
         await tx.processedEvent.upsert({
           where: {
-            transactionHash_logIndex_contractAddress: {
+            contractAddress_transactionHash_logIndex: {
+              contractAddress,
               transactionHash,
               logIndex,
-              contractAddress,
             },
           },
           update: {
@@ -233,7 +219,6 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
             status: "processed",
             eventType: decoded.eventName,
             data: decoded.args as any,
-            fencingToken: token,
           },
           create: {
             contractAddress,
@@ -244,7 +229,6 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
             status: "processed",
             eventType: decoded.eventName,
             data: decoded.args as any,
-            fencingToken: token,
           },
         });
       });
@@ -252,8 +236,35 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
       return true;
     } catch (err) {
       if ((err as Error).message === "REORG_DETECTED") throw err;
+      
       console.error(`Failed to process log ${transactionHash}-${logIndex}:`, err);
-      return false;
+
+      const errorMessage = (err as Error).message || String(err);
+
+      // Persist durable dead-letter status in the FailedEvent queue table
+      try {
+        await this.db.failedEvent.create({
+          data: {
+            contractAddress,
+            blockHash,
+            blockNumber,
+            transactionHash,
+            logIndex,
+            eventType: decoded?.eventName || "Unknown",
+            error: errorMessage,
+            data: {
+              ...(decoded ? decoded.args : { rawData: log.data, rawTopics: log.topics }),
+            } as any,
+          },
+        });
+      } catch (dbWriteErr) {
+        console.error("Critical: Failed to save the dead letter log to the database:", dbWriteErr);
+      }
+
+      // CHECKPOINT ADVANCEMENT APPROACH (Option A):
+      // Stalling advancement avoids moving checkpoints past blocks containing failed logs. 
+      // Throwing immediately aborts processRange and poll(), preventing checkpoint updates.
+      throw new Error(`INDEXER_STALL: Failing block ${blockNumber} due to log processing error: ${errorMessage}`);
     }
   }
 
@@ -312,7 +323,6 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
         await this.revertEventApplication(event, tx);
       }
 
-
       await tx.processedEvent.updateMany({
         where: {
           contractAddress,
@@ -328,111 +338,87 @@ constructor(config: IndexerConfig, db?: PrismaClient) {
       });
     });
   }
-}
-
-// ─── Live indexer: owns the poll loop, checkpoint, and leader election ───────
-
-export class MembershipIndexer extends IndexerCore {
-  private leaderElection: LeaderElectionService | null = null;
-  private running = false;
 
   /**
-   * Attach a LeaderElectionService for distributed coordination.
-   * When attached, the indexer will:
-   *  - Only poll when this instance is the elected leader
-   *  - Write fencing tokens on checkpoints and processed events
-   *  - Verify leadership before each write to prevent split-brain
+   * Actionable retry mechanism invocation manually triggered via a CLI worker context.
+   * Reprocesses a specific event record from the dead letter table.
    */
-  attachLeaderElection(service: LeaderElectionService): void {
-    this.leaderElection = service;
+  async retryFailedEvent(failedEventId: string): Promise<boolean> {
+    const failed = await this.db.failedEvent.findUnique({
+      where: { id: failedEventId },
+    });
 
-    // When we become leader, kick off a poll immediately
-    service.onBecomeLeader = async () => {
-      if (this.running) {
-        console.log("[Indexer] Became leader — starting poll cycle");
-        try {
-          await this.poll();
-        } catch (err) {
-          console.error("[Indexer] Post-leadership poll error:", err);
-        }
+    if (!failed) throw new Error("Failed event record not found");
+
+    const rawLog = {
+      address: failed.contractAddress as Address,
+      blockHash: failed.blockHash as `0x${string}`,
+      blockNumber: failed.blockNumber,
+      transactionHash: failed.transactionHash as `0x${string}`,
+      logIndex: failed.logIndex,
+      data: (failed.data as any).rawData || "0x",
+      topics: (failed.data as any).rawTopics || [],
+      removed: false,
+      transactionIndex: 0,
+    } as unknown as Log;
+
+    try {
+      const successful = await this.processLog(failed.contractAddress as Address, rawLog);
+      if (successful) {
+        await this.db.failedEvent.delete({ where: { id: failedEventId } });
+        return true;
       }
-    };
-
-    // When we lose leadership, stop processing
-    service.onLoseLeadership = async () => {
-      console.log("[Indexer] Lost leadership — pausing processing");
-    };
-  }
-
-  async start() {
-    this.running = true;
-    console.log("Starting indexer...");
-
-    while (this.running) {
-      try {
-        // If leader election is attached, only poll when we're the leader
-        if (this.leaderElection) {
-          if (this.leaderElection.isLeader()) {
-            // Verify leadership is still valid before processing
-            try {
-              await this.leaderElection.verifyLeadershipOrThrow();
-              await this.poll();
-            } catch (err) {
-              if (err instanceof FencingTokenError) {
-                console.warn("[Indexer] Not the leader, skipping poll cycle");
-              } else {
-                throw err;
-              }
-            }
-          } else {
-            // Standby: just wait, the poll loop in LeaderElectionService
-            // will call onBecomeLeader when we acquire leadership
-          }
-        } else {
-          // No leader election — standalone mode (backward compatible)
-          await this.poll();
-        }
-      } catch (error) {
-        console.error("Indexer error:", error);
-      }
-      await new Promise((resolve) => setTimeout(resolve, 10_000));
+      return false;
+    } catch (err) {
+      await this.db.failedEvent.update({
+        where: { id: failedEventId },
+        data: {
+          retryCount: { increment: 1 },
+          error: (err as Error).message || String(err),
+        },
+      });
+      return false;
     }
   }
 
-  /** Stop the indexer loop. */
-  stop(): void {
-    this.running = false;
+  /** Expose accumulation data metrics for the health/status verification endpoint. */
+  async getDeadLetterMetrics() {
+    const count = await this.db.failedEvent.count();
+    const oldest = await this.db.failedEvent.findFirst({
+      orderBy: { createdAt: "asc" },
+      select: { createdAt: true },
+    });
+
+    return {
+      deadLetterCount: count,
+      oldestUnresolvedAgeMs: oldest ? Date.now() - oldest.createdAt.getTime() : 0,
+    };
+  }
+}
+
+// ─── Live indexer: owns the poll loop and checkpoint ──────────────────────────
+
+export class MembershipIndexer extends IndexerCore {
+  async start() {
+    console.log("Starting indexer...");
+    while (true) {
+      try {
+        await this.poll();
+      } catch (error) {
+        console.error("Indexer processing cycle suspended:", error);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10_000));
+    }
   }
 
   async poll() {
     const currentBlock = await this.getClient().getBlockNumber();
     const safeTip = currentBlock - BigInt(this.config.confirmationDepth);
 
-    // Get current fencing token if leader election is active
-    const fencingToken = this.leaderElection?.getGeneration();
-
-    for (const contractAddress of this.config.contractAddresses) {
-      // Re-verify leadership before processing each contract
-      if (this.leaderElection) {
-        try {
-          await this.leaderElection.verifyLeadershipOrThrow();
-        } catch (err) {
-          if (err instanceof FencingTokenError) {
-            console.warn(`[Indexer] Lost leadership during poll, aborting`);
-            return;
-          }
-          throw err;
-        }
-      }
-
+    for (const contractAddress of this.config.contractAddresses || []) {
       const lastCheckpoint = await this.db.indexerCheckpoint.findUnique({
         where: { contractAddress },
       });
-
-      // Metric: Update Lag
-      const lastBlock = lastCheckpoint ? lastCheckpoint.lastBlock : this.config.startBlock;
-      const lag = safeTip > lastBlock ? safeTip - lastBlock : 0n;
-      indexerLagBlocks.set({ contract: contractAddress }, Number(lag));
 
       let fromBlock = lastCheckpoint ? lastCheckpoint.lastBlock + 1n : this.config.startBlock;
 
@@ -449,44 +435,15 @@ export class MembershipIndexer extends IndexerCore {
       console.log(
         `[${contractAddress}] Indexing from ${fromBlock} to ${toBlock}`,
       );
+      
+      // If processRange hits a failed event block, it throws immediately, blocking this upsert.
+      await this.processRange({ contractAddress, fromBlock, toBlock, dryRun: false });
 
-      await this.processRange({
-        contractAddress,
-        fromBlock,
-        toBlock,
-        dryRun: false,
-        fencingToken,
-      });
-
-      // Write checkpoint with fencing token
       await this.db.indexerCheckpoint.upsert({
         where: { contractAddress },
-        update: {
-          lastBlock: toBlock,
-          ...(fencingToken !== undefined ? { fencingToken } : {}),
-        },
-        create: {
-          contractAddress,
-          lastBlock: toBlock,
-          ...(fencingToken !== undefined ? { fencingToken: fencingToken! } : {}),
-        },
+        update: { lastBlock: toBlock },
+        create: { contractAddress, lastBlock: toBlock },
       });
-      try {
-        await this.processRange({ contractAddress, fromBlock, toBlock, dryRun: false });
-
-        // Metric: Success
-        indexerPollCount.inc({ contract: contractAddress, status: 'success' });
-
-        await this.db.indexerCheckpoint.upsert({
-          where: { contractAddress },
-          update: { lastBlock: toBlock },
-          create: { contractAddress, lastBlock: toBlock },
-        });
-      } catch (error) {
-        // Metric: Error
-        indexerPollCount.inc({ contract: contractAddress, status: 'error' });
-        throw error;
-      }
     }
   }
 
