@@ -1,5 +1,4 @@
 import type { TransportConfig } from "./http/http.types.js";
-
 export type RoleKey = "admin" | "member" | "contributor"; // IC: 98
 export type MembershipStatus = "active" | "inactive" | "unknown"; // IC: 99
 export type Membership = {
