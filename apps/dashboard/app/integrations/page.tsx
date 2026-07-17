@@ -3,6 +3,7 @@ import { getServerComponentSession } from "@/lib/auth/server-session";
 import { getIntegrationsList, IntegrationStatus } from "@/lib/integrations";
 import AccessDenied from "@/components/AccessDenied";
 import { hasRole } from "@/lib/permissions";
+import { formatRelativeTime } from "@/lib/format-relative-time";
 
 const StatusBadge = ({ status }: { status: IntegrationStatus }) => {
   const styles: Record<IntegrationStatus, string> = {
@@ -83,7 +84,7 @@ export default async function IntegrationsPage() {
               <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
                 <span>Adapter Strategy: {integration.details?.strategy || integration.details?.mode || "N/A"}</span>
                 {integration.lastChecked && (
-                  <span>Last Checked: {new Date(integration.lastChecked).toLocaleString()}</span>
+                  <span>Last Checked: {formatRelativeTime(integration.lastChecked)}</span>
                 )}
               </div>
             </div>

@@ -8,6 +8,7 @@ import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { ApiClientError, readApiResult } from "@/lib/api-client";
 import { getClientApiMode } from "@/lib/client-env";
 import { getActivityRefreshConfig } from "@/lib/env";
+import { formatRelativeTime } from "@/lib/format-relative-time";
 import { useActivityFeed } from "@/lib/hooks/useActivityFeed";
 import { mockGuilds, mockMembers, mockPasses, type Member as MockMember } from "@/lib/mock-data";
 import type { PaginatedResult } from "@/lib/repositories/types";
@@ -134,8 +135,11 @@ export default function DashboardPage() {
                 <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary-500" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-slate-800">{activity.description}</p>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {new Date(activity.timestamp).toLocaleString()}
+                  <p
+                    className="mt-0.5 text-xs text-slate-500"
+                    title={new Date(activity.timestamp).toLocaleString()}
+                  >
+                    {formatRelativeTime(activity.timestamp)}
                   </p>
                 </div>
               </li>

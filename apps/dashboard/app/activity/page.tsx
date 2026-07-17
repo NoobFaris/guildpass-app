@@ -3,6 +3,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import LastUpdated from "@/components/LastUpdated";
 import { getActivityRefreshConfig } from "@/lib/env";
+import { formatRelativeTime } from "@/lib/format-relative-time";
 import { useActivityFeed } from "@/lib/hooks/useActivityFeed";
 import {
   type ActivityEventSeverity,
@@ -256,8 +257,11 @@ export default function ActivityPage() {
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate font-medium text-slate-800">{activity.description}</p>
                       <div className="flex shrink-0 items-center gap-2">
-                        <span className="text-xs text-slate-400">
-                          {new Date(activity.timestamp).toLocaleString()}
+                        <span
+                          className="text-xs text-slate-400"
+                          title={new Date(activity.timestamp).toLocaleString()}
+                        >
+                          {formatRelativeTime(activity.timestamp)}
                         </span>
                         <span className={`rounded-full px-2 py-1 text-xs ${activity.source === "webhook" ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-700"}`}>
                           {activity.source}
