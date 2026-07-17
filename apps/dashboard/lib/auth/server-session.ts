@@ -12,10 +12,10 @@
  *   Returns MOCK_API_SESSION — the pre-configured mock session.
  *   Switch MOCK_API_ROLE in session.ts to test different permission levels.
  *
- * ── Future behaviour (live mode) ────────────────────────────────────────────
- *   Validate the incoming request's cookies / Authorization header / SIWE
- *   payload and return a real Session object. Until that implementation is
- *   wired up, live mode throws UnauthorizedError.
+ * ── Live mode (session-store) ──────────────────────────────────────────────
+ *   Resolves the session from an Authorization: Bearer <accessToken> header.
+ *   Access tokens are short-lived (15 min) and validated via HMAC signature.
+ *   Stale-permission window is bounded to the access-token lifetime.
  */
 
 import type { Session } from "./session";
@@ -38,7 +38,45 @@ export class UnauthorizedError extends Error {
   }
 }
 
+// ── Session store singleton ─────────────────────────────────────────────────
+
+let _sessionStore: SessionStore | null = null;
+
+/**
+ * Get or create the session store singleton.
+ * In mock mode this is unused; in live mode it validates and manages sessions.
+ */
+export function getSessionStore(): SessionStore {
+  if (!_sessionStore) {
+    _sessionStore = createSessionStore();
+  }
+  return _sessionStore;
+}
+
+/**
+ * Reset the session store (for testing).
+ */
+export function resetSessionStore(): void {
+  _sessionStore = null;
+  clearSessionStore();
+}
+
 // ── Session resolution ──────────────────────────────────────────────────────
+
+/**
+ * Extract the access token from the Authorization header.
+ */
+function extractAccessToken(request: Request): string | null {
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader) return null;
+
+  const parts = authHeader.split(" ");
+  if (parts.length !== 2 || parts[0].toLowerCase() !== "bearer") {
+    return null;
+  }
+
+  return parts[1];
+}
 
 /**
  * Resolves the current dashboard session from the incoming `Request`.
@@ -48,28 +86,36 @@ export class UnauthorizedError extends Error {
  *   Change `MOCK_API_ROLE` in `session.ts` to simulate different roles.
  *
  * **Live mode** (`DASHBOARD_API_MODE=live`):
- *   Throws `UnauthorizedError` — real session resolution is not yet implemented.
- *   Wire this up to your auth provider (next-auth, JWT decode, SIWE, etc.)
- *   when ready.
+ *   Validates the access token from the `Authorization: Bearer <token>` header.
+ *   Access tokens are short-lived (15 min) — this bounds the maximum window
+ *   of stale-permission access after a role change or revocation.
+ *   Throws `UnauthorizedError` if the token is missing, invalid, or expired.
  *
  * @throws {UnauthorizedError} When no valid session can be resolved.
  */
-export function getDashboardSession(_request: Request): Session {
+export async function getDashboardSession(request: Request): Promise<Session> {
   const mode = getApiMode();
 
   if (mode === "live") {
-    // TODO: Implement real session resolution from request headers/cookies/JWT.
-    //
-    // Example approaches:
-    //   - next-auth:  const session = await getServerSession(authOptions);
-    //   - JWT cookie: decode the session cookie from request headers
-    //   - SIWE:       validate SIWE signature from Authorization header
-    //
-    // Until implemented, reject with a clear error.
-    throw new UnauthorizedError(
-      "Live session resolution is not yet implemented. " +
-        "Set DASHBOARD_API_MODE=mock for local development."
-    );
+    const token = extractAccessToken(request);
+    if (!token) {
+      throw new UnauthorizedError(
+        "Missing or invalid Authorization header. " +
+          "Provide a Bearer token from the sign-in endpoint."
+      );
+    }
+
+    const sessionStore = getSessionStore();
+    const session = await sessionStore.validateAccessToken(token);
+
+    if (!session) {
+      throw new UnauthorizedError(
+        "Access token is invalid or expired. " +
+          "Refresh your session or sign in again."
+      );
+    }
+
+    return session;
   }
 
   // Mock mode — return the pre-configured mock API session.
@@ -91,7 +137,7 @@ export function getDashboardSession(_request: Request): Session {
  *
  * export async function POST(request: Request) {
  *   try {
- *     const session = requireDashboardSession(request);
+ *     const session = await requireDashboardSession(request);
  *     assertPermission(session, "passes:write");
  *   } catch (err) {
  *     if (err instanceof PermissionDeniedError) return apiError(err.message, 403);
@@ -102,7 +148,7 @@ export function getDashboardSession(_request: Request): Session {
  * }
  * ```
  */
-export function requireDashboardSession(request: Request): Session {
+export async function requireDashboardSession(request: Request): Promise<Session> {
   return getDashboardSession(request);
 }
 /**

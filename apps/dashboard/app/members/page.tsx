@@ -11,6 +11,7 @@ import { getClientApiMode } from "@/lib/client-env";
 import { useSession } from "@/lib/hooks/useSession";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
 import { MEMBER_ROLES } from "@/lib/member-roles";
+import { toMembersCsv } from "@/lib/members-csv";
 import { mockMembers, type Member as MockMember } from "@/lib/mock-data";
 import { canManageMembers } from "@/lib/permissions";
 import type { PaginatedResult } from "@/lib/repositories/types";
@@ -179,6 +180,20 @@ export default function MembersPage() {
     updateMutation.mutate({ id, data: { roles } });
   };
 
+  const handleExportCsv = () => {
+    const csv = toMembersCsv(members);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "guildpass-members.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <DashboardLayout title="Members" session={session}>
       {listState === "unsupported" && <UnsupportedBanner resource="members" />}
@@ -196,14 +211,27 @@ export default function MembersPage() {
           {listState === "unsupported" ? "Member listing unavailable in live mode" : resultSummary}
         </p>
 
-        {canWrite && listState !== "unsupported" && (
-          <button
-            id="btn-invite-member"
-            onClick={() => setIsInviteOpen(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700"
-          >
-            <span>+</span> Invite Member
-          </button>
+        {listState !== "unsupported" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              id="btn-export-members-csv"
+              onClick={handleExportCsv}
+              disabled={members.length === 0 || listState === "loading"}
+              className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Export CSV
+            </button>
+
+            {canWrite && (
+              <button
+                id="btn-invite-member"
+                onClick={() => setIsInviteOpen(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700"
+              >
+                <span>+</span> Invite Member
+              </button>
+            )}
+          </div>
         )}
       </div>
 
