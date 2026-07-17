@@ -7,6 +7,12 @@ import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { ApiClientError, readApiResult } from "@/lib/api-client";
 import { getClientApiMode } from "@/lib/client-env";
 import { mockPasses, type Pass as MockPass } from "@/lib/mock-data";
+import {
+  sortPasses,
+  type PassSortColumn,
+  type PassSortDirection,
+  type PassSortState,
+} from "@/lib/pass-sort";
 import type { PaginatedResult } from "@/lib/repositories/types";
 import { useSession } from "@/lib/hooks/useSession";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
@@ -44,6 +50,7 @@ export default function PassesPage() {
   const [listState, setListState] = useState<ListState>("loading");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PassStatusFilter>("all");
+  const [sort, setSort] = useState<PassSortState | null>(null);
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search, 250);
   const previousPassesRef = useRef<MockPass[]>(passes);
@@ -140,6 +147,21 @@ export default function PassesPage() {
     const end = start + passes.length - 1;
     return `Showing ${start}-${end} of ${pagination.total} passes`;
   }, [pagination, passes.length]);
+
+  const sortedPasses = useMemo(
+    () => (sort ? sortPasses(passes, sort) : passes),
+    [passes, sort]
+  );
+
+  const handleSort = (column: PassSortColumn) => {
+    setSort((current) => ({
+      column,
+      direction:
+        current?.column === column && current.direction === "ascending"
+          ? "descending"
+          : "ascending",
+    }));
+  };
 
   const handleDeactivate = (id: string) => {
     updateMutation.mutate({ id, data: { status: "inactive" } });
@@ -248,8 +270,8 @@ export default function PassesPage() {
                     setPagination((prev) => ({ ...prev, total: prev.total + 1 }));
                     setIsCreateOpen(false);
                     setForm({ name: "", description: "", price: "", maxSupply: "" });
-                  } catch (error: any) {
-                    alert(error.message);
+                  } catch (error: unknown) {
+                    alert(error instanceof Error ? error.message : "Failed to create pass.");
                   } finally {
                     setCreateLoading(false);
                   }
@@ -271,14 +293,15 @@ export default function PassesPage() {
                   <tr>
                     <th className="px-6 py-4 text-sm font-semibold text-slate-700">Name</th>
                     <th className="px-6 py-4 text-sm font-semibold text-slate-700">Description</th>
-                    <th className="px-6 py-4 text-sm font-semibold text-slate-700">Status</th>
-                    <th className="px-6 py-4 text-sm font-semibold text-slate-700">Price</th>
-                    <th className="px-6 py-4 text-sm font-semibold text-slate-700">Supply</th>
+                    <SortableHeader label="Status" column="status" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Price" column="price" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Supply" column="supply" sort={sort} onSort={handleSort} />
+                    <SortableHeader label="Created" column="createdAt" sort={sort} onSort={handleSort} />
                     {canWrite && <th className="px-6 py-4 text-sm font-semibold text-slate-700">Actions</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {passes.map((pass) => {
+                  {sortedPasses.map((pass) => {
                     const isPending = pendingIds.has(pass.id);
                     return (
                       <tr key={pass.id} className={`transition-opacity hover:bg-slate-50 ${isPending ? "pointer-events-none opacity-50" : ""}`}>
@@ -290,6 +313,9 @@ export default function PassesPage() {
                         <td className="px-6 py-4"><StatusBadge status={pass.status} /></td>
                         <td className="px-6 py-4 text-slate-600">{pass.price !== undefined ? `${pass.price} ETH` : "Free"}</td>
                         <td className="px-6 py-4 text-slate-600">{pass.currentSupply} / {pass.maxSupply ?? "unlimited"}</td>
+                        <td className="whitespace-nowrap px-6 py-4 text-slate-600">
+                          {new Date(pass.createdAt).toLocaleDateString()}
+                        </td>
                         {canWrite && (
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
@@ -327,6 +353,41 @@ export default function PassesPage() {
         </>
       )}
     </DashboardLayout>
+  );
+}
+
+function SortableHeader({
+  label,
+  column,
+  sort,
+  onSort,
+}: {
+  label: string;
+  column: PassSortColumn;
+  sort: PassSortState | null;
+  onSort: (column: PassSortColumn) => void;
+}) {
+  const direction: PassSortDirection | "none" =
+    sort?.column === column ? sort.direction : "none";
+
+  return (
+    <th
+      aria-sort={direction}
+      className="px-6 py-4 text-sm font-semibold text-slate-700"
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className="inline-flex items-center gap-1.5 whitespace-nowrap rounded px-1 py-0.5 transition-colors hover:text-violet-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+      >
+        {label}
+        {direction !== "none" && (
+          <span aria-hidden="true" className="text-violet-600">
+            {direction === "ascending" ? <>&uarr;</> : <>&darr;</>}
+          </span>
+        )}
+      </button>
+    </th>
   );
 }
 
