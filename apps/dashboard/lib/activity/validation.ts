@@ -1,60 +1,53 @@
+import { z } from "zod";
 import type { WebhookPayload } from "./types";
+import { SUPPORTED_WEBHOOK_EVENTS } from "./types";
 
 export type ValidationResult =
   | { valid: true; payload: WebhookPayload }
   | { valid: false; error: string; field?: string };
 
-const EVENT_DATA_SCHEMA: Record<
-  string,
-  Record<string, "string" | "string?" | "number?">
-> = {
-  "membership.created": { name: "string?", wallet: "string?", id: "string?" },
-  "membership.updated": { name: "string?", wallet: "string?", id: "string?" },
-  "pass.created": { name: "string?", id: "string?" },
-  "pass.updated": { name: "string?", id: "string?" },
-  "guild.updated": { name: "string?", id: "string?" },
-  "verification.completed": { wallet: "string?", id: "string?" },
-};
+const webhookPayloadSchema = z.object({
+  id: z.string().min(1, { message: "id is required" }),
+  type: z.string().min(1, { message: "type is required" }),
+  created: z.number().positive({ message: "created must be a positive number" }),
+  data: z.record(z.string(), z.unknown()),
+});
 
-type SupportedEvent = keyof typeof EVENT_DATA_SCHEMA;
+export const DataSchemas = {
+  "membership.created": z.object({
+    name: z.string().optional(),
+    wallet: z.string().optional(),
+    id: z.string().optional(),
+  }),
+  "membership.updated": z.object({
+    name: z.string().optional(),
+    wallet: z.string().optional(),
+    id: z.string().optional(),
+  }),
+  "pass.created": z.object({
+    name: z.string().optional(),
+    id: z.string().optional(),
+  }),
+  "pass.updated": z.object({
+    name: z.string().optional(),
+    id: z.string().optional(),
+  }),
+  "guild.updated": z.object({
+    name: z.string().optional(),
+    id: z.string().optional(),
+  }),
+  "verification.completed": z.object({
+    wallet: z.string().optional(),
+    id: z.string().optional(),
+  }),
+} as const;
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-function validateDataFields(
-  type: string,
-  data: unknown
-): { field: string; message: string } | null {
-  if (!isPlainObject(data)) {
-    return { field: "data", message: "'data' must be a JSON object" };
-  }
-
-  const schema = EVENT_DATA_SCHEMA[type as SupportedEvent];
-  if (!schema) {
-    return null;
-  }
-
-  for (const [field, rule] of Object.entries(schema)) {
-    const value = data[field];
-    const required = !rule.endsWith("?");
-
-    if (required && (value === undefined || value === null)) {
-      return {
-        field: `data.${field}`,
-        message: `Missing required field 'data.${field}' for '${type}' events`,
-      };
-    }
-
-    if (value !== undefined && value !== null && typeof value !== rule.replace("?", "")) {
-      return {
-        field: `data.${field}`,
-        message: `Field 'data.${field}' must be a ${rule.replace("?", "")} for '${type}' events`,
-      };
-    }
-  }
-
-  return null;
+function mapIssueToField(issue: z.ZodIssue, prefix = ""): { field: string; message: string } {
+  const path = [...prefix.split(".").filter(Boolean), ...issue.path].join(".");
+  return {
+    field: path || "body",
+    message: issue.message,
+  };
 }
 
 export function validateWebhookPayload(rawBody: string): ValidationResult {
@@ -65,52 +58,35 @@ export function validateWebhookPayload(rawBody: string): ValidationResult {
     return { valid: false, error: "Invalid JSON", field: "body" };
   }
 
-  if (!isPlainObject(parsed)) {
-    return { valid: false, error: "Payload must be a JSON object", field: "body" };
-  }
-
-  const obj = parsed as Record<string, unknown>;
-
-  if (typeof obj.id !== "string" || obj.id.length === 0) {
+  const envelopeResult = webhookPayloadSchema.safeParse(parsed);
+  if (!envelopeResult.success) {
+    const issue = envelopeResult.error.issues[0];
+    const field = issue.path.join(".") || "body";
     return {
       valid: false,
-      error: "Missing or invalid 'id' (must be a non-empty string)",
-      field: "id",
+      error: `${field}: ${issue.message}`,
+      field,
     };
   }
 
-  if (typeof obj.type !== "string" || obj.type.length === 0) {
-    return {
-      valid: false,
-      error: "Missing or invalid 'type' (must be a non-empty string)",
-      field: "type",
-    };
+  const payload = envelopeResult.data;
+
+  if (SUPPORTED_WEBHOOK_EVENTS.includes(payload.type as typeof SUPPORTED_WEBHOOK_EVENTS[number])) {
+    const schema = DataSchemas[payload.type as keyof typeof DataSchemas];
+    const dataResult = schema.safeParse(payload.data);
+
+    if (!dataResult.success) {
+      const issue = dataResult.error.issues[0];
+      const field = `data.${issue.path.join(".")}`.replace(/\.$/, "");
+      return {
+        valid: false,
+        error: `${field}: ${issue.message}`,
+        field,
+      };
+    }
   }
 
-  if (typeof obj.created !== "number" || !Number.isFinite(obj.created) || obj.created <= 0) {
-    return {
-      valid: false,
-      error: "Missing or invalid 'created' (must be a positive number)",
-      field: "created",
-    };
-  }
-
-  const dataError = validateDataFields(obj.type as string, obj.data);
-  if (dataError) {
-    return { valid: false, error: dataError.message, field: dataError.field };
-  }
-
-  if (obj.data === undefined || obj.data === null) {
-    return { valid: false, error: "Missing required field 'data'", field: "data" };
-  }
-
-  return {
-    valid: true,
-    payload: {
-      id: obj.id as string,
-      type: obj.type as string,
-      created: obj.created as number,
-      data: obj.data as Record<string, unknown>,
-    },
-  };
+  return { valid: true, payload };
 }
+
+export { webhookPayloadSchema };

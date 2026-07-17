@@ -16,6 +16,16 @@ export interface ApiSuccess<T> {
   data: T;
 }
 
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  page: number;
+  nextCursor: string | null;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export interface ApiErrorResponse {
   ok: false;
   code: ApiErrorCode;

@@ -12,6 +12,46 @@
   DATABASE_URL: process.env.DATABASE_URL,
 };
 
+/**
+ * Activity refresh configuration.
+ *
+ * All values can be controlled via environment variables so operators can tune
+ * polling behaviour without code changes.
+ */
+export interface ActivityRefreshConfig {
+  /** Polling interval in milliseconds. Set to 0 to disable auto-polling. */
+  intervalMs: number;
+  /** Maximum number of events to keep in the client feed. */
+  maxEvents: number;
+}
+
+const DEFAULT_REFRESH_MS = 15_000; // 15 seconds
+const DEFAULT_MAX_EVENTS = 500;
+
+export function getActivityRefreshConfig(): ActivityRefreshConfig {
+  const intervalMs = parseNonNegativeInteger(
+    process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS,
+    DEFAULT_REFRESH_MS
+  );
+  const maxEvents = parsePositiveInteger(
+    process.env.NEXT_PUBLIC_ACTIVITY_MAX_EVENTS,
+    DEFAULT_MAX_EVENTS
+  );
+
+  return { intervalMs, maxEvents };
+}
+
+function parseNonNegativeInteger(value: string | undefined, fallback: number): number {
+  if (value === undefined || value.trim() === "") return fallback;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = parseNonNegativeInteger(value, fallback);
+  return parsed > 0 ? parsed : fallback;
+}
+
 export function getApiMode(): "mock" | "live" {
   const m = (process.env.DASHBOARD_API_MODE || env.DASHBOARD_API_MODE)?.toLowerCase();
   return m === "live" ? "live" : "mock";

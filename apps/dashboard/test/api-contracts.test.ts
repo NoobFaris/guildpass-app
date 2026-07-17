@@ -10,12 +10,14 @@ describe("dashboard API response contract", () => {
 
     try {
       const { GET } = await import("../app/api/passes/route.js");
-      const response = await GET();
+      const response = await GET(new Request("http://localhost/api/passes"));
       const body = await response.json();
 
       assert.equal(response.status, 200);
       assert.equal(body.ok, true);
-      assert.ok(Array.isArray(body.data));
+      assert.ok(Array.isArray(body.data.items));
+      assert.equal(typeof body.data.total, "number");
+      assert.ok(body.data.nextCursor === null || typeof body.data.nextCursor === "string");
     } finally {
       restoreEnv("DASHBOARD_API_MODE", previousMode);
     }
@@ -63,7 +65,7 @@ describe("dashboard API response contract", () => {
 
     try {
       const { GET } = await import("../app/api/passes/route.js");
-      const response = await GET();
+      const response = await GET(new Request("http://localhost/api/passes"));
       const body = await response.json();
 
       assert.equal(response.status, 501);

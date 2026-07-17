@@ -6,6 +6,33 @@
 import type { Pass, Guild, Member } from "../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
 import type { DashboardSettings } from "../settings";
+import type { PaginatedResponse } from "../api-contracts";
+
+/**
+ * Input type for appending an activity event.
+ * `schemaVersion` defaults to the current version when omitted.
+ */
+export type ActivityEventInput = Omit<ActivityEvent, "id" | "timestamp"> &
+  Partial<Pick<ActivityEvent, "schemaVersion">>;
+
+export interface PaginationOptions {
+  limit?: number;
+  cursor?: string | null;
+  page?: number;
+}
+
+export type PaginatedResult<T> = PaginatedResponse<T>;
+
+export interface PassListQuery extends PaginationOptions {
+  search?: string;
+  status?: Pass["status"] | "all";
+}
+
+export interface MemberListQuery extends PaginationOptions {
+  search?: string;
+  status?: Member["status"] | "all";
+  role?: string | "all";
+}
 
 /**
  * Repository for managing passes.
@@ -15,6 +42,11 @@ export interface IPassRepository {
    * Get all passes.
    */
   getAll(): Promise<Pass[]>;
+
+  /**
+   * Query passes with filtering and bounded pagination.
+   */
+  query(options?: PassListQuery): Promise<PaginatedResult<Pass>>;
 
   /**
    * Get a pass by ID.
@@ -77,6 +109,11 @@ export interface IMemberRepository {
   getAll(): Promise<Member[]>;
 
   /**
+   * Query members with filtering and bounded pagination.
+   */
+  query(options?: MemberListQuery): Promise<PaginatedResult<Member>>;
+
+  /**
    * Get a member by ID.
    */
   getById(id: string): Promise<Member | null>;
@@ -108,9 +145,10 @@ export interface IMemberRepository {
  */
 export interface IActivityRepository {
   /**
-   * Append an activity event.
+   * Append an activity event. `schemaVersion` defaults to the current version
+   * when omitted.
    */
-  append(event: Omit<ActivityEvent, "id" | "timestamp">): Promise<ActivityEvent>;
+  append(event: ActivityEventInput): Promise<ActivityEvent>;
 
   /**
    * Query activity events with optional filtering.
