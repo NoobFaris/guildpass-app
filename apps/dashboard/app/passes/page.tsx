@@ -2,6 +2,7 @@
 
 import DashboardLayout from "@/components/DashboardLayout";
 import EmptyState from "@/components/EmptyState";
+import PaginationControls from "@/components/PaginationControls";
 import StatusBadge from "@/components/StatusBadge";
 import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { ApiClientError, readApiResult } from "@/lib/api-client";
@@ -388,32 +389,6 @@ function SortableHeader({
         )}
       </button>
     </th>
-  );
-}
-
-function PaginationControls({
-  page,
-  hasPreviousPage,
-  hasNextPage,
-  onPrevious,
-  onNext,
-}: {
-  page: number;
-  hasPreviousPage: boolean;
-  hasNextPage: boolean;
-  onPrevious: () => void;
-  onNext: () => void;
-}) {
-  return (
-    <div className="mt-4 flex items-center justify-between">
-      <button onClick={onPrevious} disabled={!hasPreviousPage} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
-        Previous
-      </button>
-      <span className="text-sm text-slate-500">Page {page}</span>
-      <button onClick={onNext} disabled={!hasNextPage} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
-        Next
-      </button>
-    </div>
   );
 }
 
