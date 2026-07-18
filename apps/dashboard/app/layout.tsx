@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { GuildProvider } from "@/lib/guild/GuildProvider";
 
 export const metadata: Metadata = {
   title: "GuildPass Dashboard",
@@ -13,7 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <GuildProvider>{children}</GuildProvider>
+      </body>
     </html>
   );
 }

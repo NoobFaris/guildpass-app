@@ -12,6 +12,7 @@ import {
 } from "@guildpass/integration-client";
 import type { ActivityChange } from "@guildpass/integration-client";
 import { useMemo, useState } from "react";
+import { useGuild } from "@/lib/guild/GuildProvider";
 
 const TYPE_ICON: Record<ActivityEventType, string> = {
   "member.joined": "👤",
@@ -78,6 +79,7 @@ const SEVERITY_FILTERS: { label: string; value: ActivityEventSeverity | "" }[] =
 ];
 
 export default function ActivityPage() {
+  const { guildId, guild } = useGuild();
   const [type, setType] = useState<ActivityEventType | "">("");
   const [source, setSource] = useState<ActivityEventSource | "">("");
   const [severity, setSeverity] = useState<ActivityEventSeverity | "">("");
@@ -111,6 +113,7 @@ export default function ActivityPage() {
     from: fromIso,
     autoRefresh: true,
     simulate: false,
+    guildId,
   });
 
   const hasActiveFilters = Boolean(type || source || severity || actor.trim() || from);
@@ -124,7 +127,10 @@ export default function ActivityPage() {
   };
 
   return (
-    <DashboardLayout title="Activity">
+    <DashboardLayout
+      title="Activity"
+      subtitle={guild ? `Scoped to ${guild.name}` : undefined}
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-sm text-slate-500">

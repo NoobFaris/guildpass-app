@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import Link from "next/link";
 import { getClientApiMode } from '@/lib/client-env';
 import DashboardLayout from "@/components/DashboardLayout";
 import EmptyState from "@/components/EmptyState";
@@ -10,10 +11,12 @@ import { useSession } from "@/lib/hooks/useSession";
 import { canManageGuilds } from "@/lib/permissions";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
 import { readApiResult } from "@/lib/api-client";
+import { useGuild } from "@/lib/guild/GuildProvider";
 
 export default function GuildsPage() {
   const session = useSession();
   const canWrite = canManageGuilds(session);
+  const { guildId: activeGuildId, setGuildId, setGuilds: setContextGuilds } = useGuild();
   const [guilds, setGuilds] = useState<MockGuild[]>(mockGuilds);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [listState] = useState<"loading" | "loaded" | "unsupported" | "error">("loading");
@@ -28,6 +31,7 @@ export default function GuildsPage() {
         const data = await readApiResult<MockGuild[]>(res);
         if (mounted) {
           setGuilds(data);
+          setContextGuilds(data);
           previousGuildsRef.current = data;
         }
       } catch (err) {
@@ -149,10 +153,21 @@ export default function GuildsPage() {
           {guilds.map((guild) => {
             const isPending = pendingIds.has(guild.id);
             return (
-              <div key={guild.id} className={`bg-white border border-slate-200 rounded-xl p-6 transition-all ${isPending ? "opacity-50 scale-[0.98] pointer-events-none" : "hover:shadow-md"}`}>
+              <div key={guild.id} className={`bg-white border rounded-xl p-6 transition-all ${
+                guild.id === activeGuildId
+                  ? "border-violet-300 ring-2 ring-violet-100"
+                  : "border-slate-200"
+              } ${isPending ? "opacity-50 scale-[0.98] pointer-events-none" : "hover:shadow-md"}`}>
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="text-lg font-semibold text-slate-800">{guild.name}</h3>
-                  {isPending && <span className="text-xs text-slate-400 animate-pulse">updating...</span>}
+                  <div className="flex items-center gap-2">
+                    {guild.id === activeGuildId && (
+                      <span className="text-xs font-medium text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+                        Active
+                      </span>
+                    )}
+                    {isPending && <span className="text-xs text-slate-400 animate-pulse">updating...</span>}
+                  </div>
                 </div>
                 <p className="text-slate-600 mb-4">{guild.description}</p>
                 <div className="flex gap-4 text-sm mb-6">
@@ -166,23 +181,41 @@ export default function GuildsPage() {
                   </div>
                 </div>
 
-                {canWrite && (
-                  <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
-                    <button
-                      onClick={() => handleRename(guild.id, guild.name)}
-                      className="text-xs font-medium text-slate-600 hover:text-violet-600 transition-colors"
-                    >
-                      Rename
-                    </button>
-                    <span className="text-slate-300">·</span>
-                    <button
-                      onClick={() => handleDelete(guild.id)}
-                      className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+                  <Link
+                    href={`/guilds/${guild.id}`}
+                    onClick={() => setGuildId(guild.id)}
+                    className="text-xs font-medium text-violet-600 hover:text-violet-800 transition-colors"
+                  >
+                    Open
+                  </Link>
+                  <span className="text-slate-300">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setGuildId(guild.id)}
+                    className="text-xs font-medium text-slate-600 hover:text-violet-600 transition-colors"
+                  >
+                    {guild.id === activeGuildId ? "Selected" : "Switch to"}
+                  </button>
+                  {canWrite && (
+                    <>
+                      <span className="text-slate-300">·</span>
+                      <button
+                        onClick={() => handleRename(guild.id, guild.name)}
+                        className="text-xs font-medium text-slate-600 hover:text-violet-600 transition-colors"
+                      >
+                        Rename
+                      </button>
+                      <span className="text-slate-300">·</span>
+                      <button
+                        onClick={() => handleDelete(guild.id)}
+                        className="text-xs font-medium text-red-500 hover:text-red-700 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             );
           })}
