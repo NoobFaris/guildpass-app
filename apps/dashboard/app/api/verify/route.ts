@@ -6,6 +6,7 @@ import {
 } from "@/lib/api-helpers";
 import { getEnv, getApiMode } from "@/lib/env";
 import { IntegrationClient, type VerificationResult } from "@guildpass/integration-client";
+import { isValidChecksumAddress, normaliseAddress } from "@/dashboard/lib/address";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   return handleApiError(async () => {
@@ -22,6 +23,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ]);
     }
 
+    if (!isValidChecksumAddress(wallet)) {
+      return apiValidationError("Invalid wallet", [
+        { field: "wallet", message: "wallet must be a checksummed Ethereum address" },
+      ]);
+    }
+    const normalizedWallet = normaliseAddress(wallet);
+
     if (mode === "live") {
       // Allow injecting a test client via globalThis for unit tests
       const testClient = (globalThis as any).__TEST_INTEGRATION_CLIENT;
@@ -35,7 +43,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
       const result: VerificationResult = await client.verifyWallet(
         discordUserId,
-        wallet
+        normalizedWallet
       );
 
       return apiResponse(result);

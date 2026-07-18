@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MEMBER_ROLES } from "@/lib/member-roles";
+import { isValidChecksumAddress, normaliseAddress } from "../address";
 
 export type FieldValidationError = {
   field: string;
@@ -333,6 +334,14 @@ export function validateMemberCreatePayload(payload: unknown): ValidationResult<
     errors,
     "wallet is required"
   );
+  let normalizedWallet: string | undefined;
+  if (wallet !== undefined) {
+    if (!isValidChecksumAddress(wallet as string)) {
+      errors.push({ field: "wallet", message: "wallet must be a checksummed Ethereum address" });
+    } else {
+      normalizedWallet = normaliseAddress(wallet as string);
+    }
+  }
   const roles = parseField(memberCreateSchema.shape.roles, payload.roles, "roles", errors, "roles must be an array") ?? [];
   const status =
     parseField(
@@ -357,7 +366,7 @@ export function validateMemberCreatePayload(payload: unknown): ValidationResult<
     valid: true,
     data: {
       name: name as string,
-      wallet: wallet as string,
+      wallet: (normalizedWallet ?? wallet) as string,
       status,
       roles: [...new Set(roles)],
       joinedAt,
@@ -388,6 +397,14 @@ export function validateMemberUpdatePayload(payload: unknown): ValidationResult<
     errors,
     "wallet must be a non-empty string"
   );
+  let normalizedWallet: string | undefined;
+  if (wallet !== undefined) {
+    if (!isValidChecksumAddress(wallet as string)) {
+      errors.push({ field: "wallet", message: "wallet must be a checksummed Ethereum address" });
+    } else {
+      normalizedWallet = normaliseAddress(wallet as string);
+    }
+  }
   const roles = parseField(memberUpdateSchema.shape.roles, payload.roles, "roles", errors, "roles must be an array");
   const joinedAt = parseField(
     memberUpdateSchema.shape.joinedAt,
@@ -412,7 +429,7 @@ export function validateMemberUpdatePayload(payload: unknown): ValidationResult<
   );
 
   if (name !== undefined) data.name = name;
-  if (wallet !== undefined) data.wallet = wallet;
+  if (wallet !== undefined) data.wallet = normalizedWallet ?? wallet;
   if (roles !== undefined) data.roles = roles ? [...new Set(roles)] : [];
   if (joinedAt !== undefined) data.joinedAt = joinedAt;
   if (lastActive !== undefined) data.lastActive = lastActive;
