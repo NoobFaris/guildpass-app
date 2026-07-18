@@ -8,7 +8,6 @@ import {
 } from "@/lib/api-helpers";
 import { NotFoundError } from "@/lib/api-errors";
 import { mockMembers, type Member } from "@/lib/mock-data";
-import { getActiveGuildId } from "@/lib/guild-context";
 import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { IntegrationClient } from "@guildpass/integration-client";
 import { getEnv, getApiMode } from "@/lib/env";
@@ -48,7 +47,6 @@ export async function GET(request: Request): Promise<NextResponse> {
           if (!m) return apiResponse([], { status: 200 });
           const mapped: Member = {
             id: m.userId,
-            guildId: getActiveGuildId(),
             wallet: m.wallet ?? "",
             name: m.userId,
             status: m.status === "unknown" ? "pending" : m.status,
@@ -64,7 +62,6 @@ export async function GET(request: Request): Promise<NextResponse> {
           if (!m) return apiResponse([], { status: 200 });
           const mapped: Member = {
             id: m.userId,
-            guildId: getActiveGuildId(),
             wallet: m.wallet ?? "",
             name: m.userId,
             status: m.status === "unknown" ? "pending" : m.status,
@@ -88,7 +85,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     try {
       const memberRepository = getMemberRepository();
-      return apiResponse(await memberRepository.query(getActiveGuildId(), query));
+      return apiResponse(await memberRepository.query(query));
     } catch (error) {
       console.error("Error fetching members:", error);
       return apiResponse(getFallbackMembers(query));
@@ -118,9 +115,7 @@ function isMemberStatus(value: string | null): value is Member["status"] {
 }
 
 function getFallbackMembers(query: MemberListQuery) {
-  const guildId = getActiveGuildId();
-  const scoped = mockMembers.filter((member) => member.guildId === guildId);
-  const filtered = filterMembers(scoped, query);
+  const filtered = filterMembers(mockMembers, query);
   return paginateItems(filtered, query);
 }
 
@@ -143,7 +138,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const memberRepository = getMemberRepository();
-    const created = await memberRepository.create(getActiveGuildId(), validation.data);
+    const created = await memberRepository.create(validation.data);
     await recordDashboardActivity({
       type: "member.joined",
       entity: { type: "member", id: created.id, name: created.name },
@@ -181,9 +176,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     }
 
     const memberRepository = getMemberRepository();
-    const guildId = getActiveGuildId();
-    const existing = validation.data.roles ? await memberRepository.getById(guildId, id) : null;
-    const updated = await memberRepository.update(guildId, id, validation.data);
+    const existing = validation.data.roles ? await memberRepository.getById(id) : null;
+    const updated = await memberRepository.update(id, validation.data);
     if (!updated) throw new NotFoundError("Member not found.");
     const rolesChanged = existing && validation.data.roles && JSON.stringify(existing.roles) !== JSON.stringify(validation.data.roles);
     if (rolesChanged) {
@@ -213,10 +207,9 @@ export async function DELETE(request: Request): Promise<NextResponse> {
 
   return handleApiError(async () => {
     const memberRepository = getMemberRepository();
-    const guildId = getActiveGuildId();
-    const member = await memberRepository.getById(guildId, id);
+    const member = await memberRepository.getById(id);
     if (!member) throw new NotFoundError("Member not found.");
-    const success = await memberRepository.delete(guildId, id);
+    const success = await memberRepository.delete(id);
     if (!success) throw new NotFoundError("Member not found.");
     await recordDashboardActivity({
       type: "member.left",
