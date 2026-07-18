@@ -24,7 +24,6 @@ import { canEditSettings } from "@/lib/permissions";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
 import { readApiResult } from "@/lib/api-client";
 import type { DashboardSettings } from "@/lib/settings";
-import { SUPPORTED_TIMEZONES } from "@/lib/timezones";
 import { useState, useRef, useEffect } from "react";
 
 export default function SettingsPage() {
@@ -166,11 +165,9 @@ export default function SettingsPage() {
                       : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"
                     } ${saveMutation.isPending ? "opacity-50" : ""}`}
                 >
-                  {SUPPORTED_TIMEZONES.map((supportedTimezone) => (
-                    <option key={supportedTimezone} value={supportedTimezone}>
-                      {supportedTimezone}
-                    </option>
-                  ))}
+                  <option>UTC</option>
+                  <option>America/New_York</option>
+                  <option>Europe/London</option>
                 </select>
               </div>
             </div>
