@@ -178,6 +178,16 @@ export interface IMemberRepository {
    * or belongs to a different guild.
    */
   delete(guildId: string, id: string): Promise<boolean>;
+
+  /**
+   * Stream all members for a guild in bounded-size chunks.
+   *
+   * The async iterator yields pages internally (cursor-based when backed by
+   * a database); callers simply iterate without managing cursors. Never
+   * materializes the full result set — each page is fetched on demand so
+   * memory usage stays proportional to `chunkSize`, not the total count.
+   */
+  streamAll(guildId: string, chunkSize?: number): AsyncIterable<Member[]>;
 }
 
 /**

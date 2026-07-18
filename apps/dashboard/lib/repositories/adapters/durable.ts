@@ -229,6 +229,19 @@ export class DurableMemberRepository extends DurableRepository implements IMembe
     // TODO: DELETE ... WHERE guild_id = $1 AND id = $2
     throw new Error("DurableMemberRepository not yet implemented");
   }
+
+  async *streamAll(_guildId: string, _chunkSize?: number): AsyncIterable<Member[]> {
+    // TODO: Use keyset/cursor pagination (ORDER BY id LIMIT $1) in a loop.
+    // Each iteration fetches one page and yields it, so the full result set
+    // is never held in memory.  Example pattern:
+    //   let cursor: string | null = null;
+    //   do {
+    //     const page = await this.query(guildId, { cursor, limit: _chunkSize ?? 500 });
+    //     yield page.items;
+    //     cursor = page.nextCursor;
+    //   } while (cursor);
+    throw new Error("DurableMemberRepository not yet implemented");
+  }
 }
 
 /**
