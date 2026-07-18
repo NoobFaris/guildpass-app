@@ -3,6 +3,7 @@
 import DashboardLayout from "@/components/DashboardLayout";
 import LastUpdated from "@/components/LastUpdated";
 import StatCard from "@/components/StatCard";
+import { StatCardSkeleton } from "@/components/StatCardSkeleton";
 import StatusBadge from "@/components/StatusBadge";
 import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { ApiClientError, readApiResult } from "@/lib/api-client";
@@ -21,13 +22,12 @@ export default function DashboardPage() {
   const { intervalMs } = getActivityRefreshConfig();
   const apiMode = getClientApiMode();
 
-  const [passesCount, setPassesCount] = useState(mockPasses.length);
-  const [guildsCount, setGuildsCount] = useState(mockGuilds.length);
-  const [activeMembersCount, setActiveMembersCount] = useState(
-    mockMembers.filter((m) => m.status === "active").length
-  );
+  const [passesCount, setPassesCount] = useState<number | null>(null);
+  const [guildsCount, setGuildsCount] = useState<number | null>(null);
+  const [activeMembersCount, setActiveMembersCount] = useState<number | null>(null);
   const [unsupportedResources, setUnsupportedResources] = useState<UnsupportedResource[]>([]);
   const [hasError, setHasError] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
@@ -66,6 +66,7 @@ export default function DashboardPage() {
       if (mounted) {
         setUnsupportedResources(unsupported);
         setHasError(encounteredError);
+        setStatsLoading(false);
       }
     }
 
@@ -105,13 +106,20 @@ export default function DashboardPage() {
           </p>
         </div>
       )}
-
-      <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Passes" value={passesCount} icon="P" trend="+2 this week" />
-        <StatCard title="Active Guilds" value={guildsCount} icon="G" trend="+1 this week" />
-        <StatCard title="Active Members" value={activeMembersCount} icon="M" trend="+12 this week" />
-        <StatCard title="Total Activity" value={events.length} icon="A" trend="live" />
-      </div>
+      
+      {statsLoading ? (
+        <StatCardSkeleton />
+      ) : (
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Total Passes" value={passesCount ?? mockPasses.length} icon="P" trend="+2 this week" />
+          <StatCard title="Active Guilds" value={guildsCount ?? mockGuilds.length} icon="G" trend="+1 this week" />
+          <StatCard title="Active Members" value={activeMembersCount ?? mockMembers.filter((m) => m.status === "active").length} icon="M" trend="+12 this week" />
+          <StatCard title="Total Activity" value={events.length} icon="A" trend="live" />
+        </div>
+      )}
+          
+          
+          
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-6">

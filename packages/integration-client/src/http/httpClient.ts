@@ -1,10 +1,13 @@
-import type { HttpRequestOptions, TransportConfig } from "./http.types.js";
+import { type HttpRequestOptions, type TransportConfig, DEFAULT_RETRY_CONFIG } from "./http.types.js";
 
 export class HttpClient {
-  private config: TransportConfig;
+private config: TransportConfig;
 
-  constructor(config: TransportConfig = {}) {
-    this.config = config;
+constructor(config: TransportConfig = {}) {
+    this.config = {
+      ...config,
+      retry: config.retry === undefined ? DEFAULT_RETRY_CONFIG : config.retry,
+    };
   }
 
   async request(url: string, options: HttpRequestOptions = {}): Promise<Response> {

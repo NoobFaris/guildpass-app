@@ -5,6 +5,7 @@ import EmptyState from "@/components/EmptyState";
 import PaginationControls from "@/components/PaginationControls";
 import RoleEditor from "@/components/RoleEditor";
 import StatusBadge from "@/components/StatusBadge";
+import TruncatedWallet from "@/components/TruncatedWallet";
 import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { ApiClientError, readApiResult } from "@/lib/api-client";
 import { getClientApiMode } from "@/lib/client-env";
@@ -16,6 +17,7 @@ import { mockMembers, type Member as MockMember } from "@/lib/mock-data";
 import { canManageMembers } from "@/lib/permissions";
 import type { PaginatedResult } from "@/lib/repositories/types";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 
 type ListState = "loading" | "loaded" | "unsupported" | "error";
 type MemberStatusFilter = MockMember["status"] | "all";
@@ -353,7 +355,7 @@ export default function MembersPage() {
                           {member.name}
                           {isPending && <span className="ml-2 text-xs text-slate-400">(updating...)</span>}
                         </td>
-                        <td className="px-6 py-4 font-mono text-sm text-slate-600">{member.wallet.slice(0, 6)}...{member.wallet.slice(-4)}</td>
+                        <td className="px-6 py-4"><TruncatedWallet address={member.wallet} /></td>
                         <td className="px-6 py-4"><StatusBadge status={member.status} /></td>
                         <td className="px-6 py-4 text-slate-600">
                           <RoleEditor roles={member.roles ?? []} disabled={!canWrite || isPending} onChange={(roles) => handleRolesChange(member.id, roles)} />
