@@ -15,19 +15,13 @@ function makePrisma() {
 
 describe("MembershipIndexer logic", () => {
   test("Indexer initialization", () => {
-    const indexer = new MembershipIndexer(
-      {
-        rpcUrl: "http://localhost:8545",
-        contractAddress: "0x0000000000000000000000000000000000000000",
-        confirmationDepth: 10,
-        startBlock: 0n,
-      },
-      makePrisma()
-    );
-    assert.ok(indexer);
-  });
-
-  // More complex tests would require deep mocking of Prisma and Viem
-  // which is out of scope for a quick check, but the patterns required
-  // (reorg detection, idempotent processing) are covered in backfill.test.ts.
+    const indexer = new MembershipIndexer({
+  rpcUrl: "http://localhost:8545",
+  contractAddresses: ["0x..."], // Use your actual contract address string here
+  confirmationDepth: 10,
+  deepReorgDepth: 1000,
+  startBlock: 0n,
+   prisma: makePrisma(),
+ });
+});
 });

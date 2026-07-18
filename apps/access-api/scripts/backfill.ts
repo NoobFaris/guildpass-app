@@ -245,13 +245,15 @@ async function main() {
     }
     lockAcquired = !dryRun;
 
-    // Build config ─────────────────────────────────────────────────────────────
-    const config: IndexerConfig = {
-      rpcUrl: rpcUrl!,
-      contractAddress,
-      confirmationDepth,
-      startBlock,
-    };
+   // Build config ─────────────────────────────────────────────────────────────
+  const config: IndexerConfig = {
+    rpcUrl: rpcUrl!,
+    contractAddress,
+    confirmationDepth,
+    deepReorgDepth: 1000, // You can adjust this value if needed
+    startBlock,
+    prisma: prisma,       // This passes the instance created on line 224
+  };
 
     const core = new IndexerCore(config);
 

@@ -25,17 +25,13 @@ function makePrisma() {
  */
 describe("MembershipIndexer Reorg and Finality", () => {
   test("Indexer initialized with correct config", () => {
-    const indexer = new MembershipIndexer(
-      {
-        rpcUrl: "http://localhost:8545",
-        contractAddress: "0x0000000000000000000000000000000000000000",
-        confirmationDepth: 10,
-        startBlock: 0n,
-      },
-      makePrisma()
-    );
-    assert.ok(indexer);
-  });
+   const indexer = new MembershipIndexer({
+  rpcUrl: "http://localhost:8545",
+  contractAddresses: ["0x..."], // Use your actual contract address string here
+  confirmationDepth: 10,
+  deepReorgDepth: 1000,
+  startBlock: 0n,
+  prisma: makePrisma(),
 
   // Note: Full behavioral tests for reorgs would require mocking the
   // Prisma transaction client and Viem's getLogs/getBlock in a way that
@@ -45,4 +41,6 @@ describe("MembershipIndexer Reorg and Finality", () => {
   // 2. Block hash verification in a window (checkReorg).
   // 3. Application state rollback (handleReorg calling revertEventApplication).
   // 4. Idempotency with reorg detection (processLog).
+  });
+});
 });
