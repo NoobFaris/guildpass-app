@@ -22,7 +22,17 @@ const ROLE_BADGE: Record<string, { label: string; className: string }> = {
   readonly: { label: "Read-only", className: "bg-slate-500 text-white" },
 };
 
-export default function Sidebar({ session }: { session?: Session }) {
+export default function Sidebar({
+  session,
+  isOpen,
+  onClose,
+}: {
+  session?: Session;
+  /** Whether the sidebar is visible on mobile. Ignored on desktop (always visible). */
+  isOpen?: boolean;
+  /** Called when the close button is clicked — only rendered on mobile. */
+  onClose?: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const guildCtx = useOptionalGuild();
@@ -43,11 +53,40 @@ export default function Sidebar({ session }: { session?: Session }) {
   };
 
   return (
-    <div className="w-64 bg-slate-900 text-white h-screen flex flex-col fixed left-0 top-0">
-      <div className="p-6 border-b border-slate-700">
+    <div
+      className={`w-64 bg-slate-900 text-white h-screen flex flex-col fixed left-0 top-0 z-50
+        transition-transform duration-300 ease-in-out
+        ${isOpen ? "translate-x-0" : "-translate-x-full"}
+        md:translate-x-0`}
+    >
+      <div className="p-6 border-b border-slate-700 flex items-center justify-between">
         <h1 className="text-xl font-bold flex items-center gap-2">
           <span>🛡️</span> GuildPass
         </h1>
+
+        {/* Close button — visible only on mobile */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="md:hidden inline-flex items-center justify-center p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            aria-label="Close sidebar"
+          >
+            <svg
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* ── Guild (tenant) switcher ───────────────────────────────────────── */}
@@ -91,6 +130,7 @@ export default function Sidebar({ session }: { session?: Session }) {
               <li key={item.name}>
                 <Link
                   href={item.href}
+                  onClick={onClose}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                     isActive
                       ? "bg-slate-800 text-primary-300 font-medium"

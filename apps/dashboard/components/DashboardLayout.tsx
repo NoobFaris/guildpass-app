@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useCallback } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import type { Session } from "@/lib/auth/session";
@@ -24,6 +27,11 @@ export default function DashboardLayout({
   /** Optional subtitle shown under the page title (e.g. active guild name). */
   subtitle?: string;
 }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const toggleSidebar = useCallback(() => setSidebarOpen((prev) => !prev), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
   return (
     <div className="min-h-screen flex">
       {initialGuildId ? <GuildRouteSync guildId={initialGuildId} /> : null}
