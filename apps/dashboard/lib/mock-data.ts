@@ -35,6 +35,8 @@ export interface Member {
   roles: string[];
   joinedAt: string;
   lastActive: string;
+  /** Monotonically increasing version number for optimistic concurrency control. */
+  version: number;
 }
 
 export interface Activity {

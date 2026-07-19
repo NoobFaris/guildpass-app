@@ -122,7 +122,7 @@ export default function MembersPage() {
     };
   }, [apiMode, debouncedSearch, page, role, status, guildId]);
 
-  const updateMutation = useOptimisticMutation<MockMember, { id: string; data: Partial<MockMember> }>({
+  const updateMutation = useOptimisticMutation<MockMember, { id: string; data: Partial<MockMember> & { version?: number } }>({
     mutationFn: async ({ id, data }) => {
       const res = await guildFetch(`/api/members?id=${id}`, guildId, {
         method: "PATCH",
@@ -153,7 +153,11 @@ export default function MembersPage() {
       });
     },
     onError: (error) => {
-      alert(error.message);
+      if (error instanceof ApiClientError && error.code === "CONFLICT") {
+        alert("This member was updated elsewhere — refresh and retry.");
+      } else {
+        alert(error.message);
+      }
     },
   });
 
@@ -200,7 +204,8 @@ export default function MembersPage() {
   };
 
   const handleRolesChange = (id: string, roles: string[]) => {
-    updateMutation.mutate({ id, data: { roles } });
+    const member = members.find((m) => m.id === id);
+    updateMutation.mutate({ id, data: { roles, version: member?.version } });
   };
 
   const handleExportCsv = () => {

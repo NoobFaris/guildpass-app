@@ -192,6 +192,8 @@ export const memberUpdateSchema = z.object({
   }).optional(),
   joinedAt: isoDateField("joinedAt").optional(),
   lastActive: isoDateField("lastActive").optional(),
+  /** Expected version for optimistic concurrency control. */
+  version: z.number().int().positive().optional(),
 }).passthrough();
 
 export function malformedPayloadError(): FieldValidationError[] {

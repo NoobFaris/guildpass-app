@@ -51,6 +51,7 @@ import type { DashboardSettings } from "../../settings";
 import { DEFAULT_SETTINGS } from "../../settings";
 import { validateSettingsPatch, type FieldError, type SettingsPatchPayload } from "@/lib/validation/settings";
 import { computeDiff } from "@/lib/activity/diff";
+import { ConflictError } from "@/lib/api-errors";
 
 /**
  * Thrown when a settings write is rejected by repository-boundary validation.
@@ -246,8 +247,8 @@ export class DurableGuildRepository extends DurableRepository implements IGuildR
    */
   private async withDerivedCounts(guild: Guild): Promise<Guild> {
     const [memberCount, passCount] = await Promise.all([
-      this.memberRepo ? this.memberRepo.getAll().then((m) => m.length) : Promise.resolve(guild.memberCount),
-      this.passRepo ? this.passRepo.getAll().then((p) => p.length) : Promise.resolve(guild.passCount),
+      this.memberRepo ? this.memberRepo.getAll(guild.id).then((m) => m.length) : Promise.resolve(guild.memberCount),
+      this.passRepo ? this.passRepo.getAll(guild.id).then((p) => p.length) : Promise.resolve(guild.passCount),
     ]);
     return { ...guild, memberCount, passCount };
   }
@@ -343,58 +344,163 @@ export class DurableGuildRepository extends DurableRepository implements IGuildR
  *   apps/dashboard/test/repositories/contracts.ts
  */
 export class DurableMemberRepository extends DurableRepository implements IMemberRepository {
-  async getAll(_guildId: string): Promise<Member[]> {
-    // TODO: SELECT ... WHERE guild_id = $1
-    throw new Error("DurableMemberRepository not yet implemented");
+  private members: Map<string, Member> = new Map();
+  private walletIndex: Map<string, string> = new Map();
+  private nextId = 1;
+  private readonly writeLock = new AsyncMutex();
+
+  constructor(
+    connectionString: string,
+    activityRepo?: IActivityRepository,
+    deps?: { seed?: Member[] },
+  ) {
+    super(connectionString, activityRepo);
+    if (deps?.seed) {
+      for (const m of deps.seed) {
+        this.members.set(m.id, { ...m });
+        this.walletIndex.set(this.walletKey(m.guildId, m.wallet), m.id);
+      }
+      this.nextId = this.members.size + 1;
+    }
   }
 
-  async query(_guildId: string, _options: MemberListQuery = {}): Promise<PaginatedResult<Member>> {
-    // Durable backends should push search/filter/pagination into indexed
-    // queries; every predicate must be ANDed with guild_id = $1.
-    throw new Error("DurableMemberRepository not yet implemented");
+  /** Composite wallet-index key: wallets are unique per guild, not globally. */
+  private walletKey(guildId: string, wallet: string): string {
+    return `${guildId}::${wallet}`;
   }
 
-  async getById(_guildId: string, _id: string): Promise<Member | null> {
-    // TODO: SELECT ... WHERE guild_id = $1 AND id = $2
-    throw new Error("DurableMemberRepository not yet implemented");
+  /** Resolve a member only if it belongs to the given guild. */
+  private getScoped(guildId: string, id: string): Member | null {
+    const member = this.members.get(id);
+    return member && member.guildId === guildId ? member : null;
   }
 
-  async getByWallet(_guildId: string, _wallet: string): Promise<Member | null> {
-    // High-traffic operation; should be indexed on (guild_id, wallet)
-    throw new Error("DurableMemberRepository not yet implemented");
+  async getAll(guildId: string): Promise<Member[]> {
+    return Array.from(this.members.values()).filter((m) => m.guildId === guildId);
   }
 
-  async create(_guildId: string, _member: MemberCreateData): Promise<Member> {
-    // TODO: Within transaction — INSERT with guild_id from the scope parameter,
-    // then this.recordDiff({}, created, "member.joined", desc, "member", id, name)
-    throw new Error("DurableMemberRepository not yet implemented");
+  async query(guildId: string, options: MemberListQuery = {}): Promise<PaginatedResult<Member>> {
+    const { filterMembers, paginateItems } = await import("@/lib/pagination");
+    const filtered = filterMembers(await this.getAll(guildId), options);
+    return paginateItems(filtered, options);
   }
 
-  async update(_guildId: string, _id: string, _member: MemberUpdateData): Promise<Member | null> {
-    // TODO: Within transaction — SELECT ... WHERE guild_id = $1 AND id = $2
-    // FOR UPDATE, compute diff via
-    // this.recordDiff(existing, updated, eventType, desc, "member", id, name),
-    // then UPDATE (guild_id must never appear in the SET clause).
-    // Use member.roles_changed when roles differ, otherwise member.left.
-    throw new Error("DurableMemberRepository not yet implemented");
+  async getById(guildId: string, id: string): Promise<Member | null> {
+    return this.getScoped(guildId, id);
   }
 
-  async delete(_guildId: string, _id: string): Promise<boolean> {
-    // TODO: DELETE ... WHERE guild_id = $1 AND id = $2
-    throw new Error("DurableMemberRepository not yet implemented");
+  async getByWallet(guildId: string, wallet: string): Promise<Member | null> {
+    const id = this.walletIndex.get(this.walletKey(guildId, wallet));
+    return id ? this.getScoped(guildId, id) : null;
   }
 
-  async *streamAll(_guildId: string, _chunkSize?: number): AsyncIterable<Member[]> {
-    // TODO: Use keyset/cursor pagination (ORDER BY id LIMIT $1) in a loop.
-    // Each iteration fetches one page and yields it, so the full result set
-    // is never held in memory.  Example pattern:
-    //   let cursor: string | null = null;
-    //   do {
-    //     const page = await this.query(guildId, { cursor, limit: _chunkSize ?? 500 });
-    //     yield page.items;
-    //     cursor = page.nextCursor;
-    //   } while (cursor);
-    throw new Error("DurableMemberRepository not yet implemented");
+  async create(guildId: string, member: MemberCreateData): Promise<Member> {
+    return this.writeLock.runExclusive(async () => {
+      const id = String(this.nextId++);
+      const newMember: Member = { ...member, id, guildId, version: 1 };
+      this.members.set(id, newMember);
+      this.walletIndex.set(this.walletKey(guildId, member.wallet), id);
+
+      await this.recordDiff(
+        {} as Record<string, unknown>,
+        newMember as unknown as Record<string, unknown>,
+        "member.joined",
+        `${newMember.name} joined`,
+        "member",
+        id,
+        newMember.name,
+      );
+
+      return newMember;
+    });
+  }
+
+  async update(
+    guildId: string,
+    id: string,
+    member: MemberUpdateData,
+    expectedVersion?: number,
+  ): Promise<Member | null> {
+    return this.writeLock.runExclusive(async () => {
+      const existing = this.getScoped(guildId, id);
+      if (!existing) return null;
+
+      // Optimistic concurrency control: reject if version doesn't match
+      if (expectedVersion !== undefined && existing.version !== expectedVersion) {
+        throw new ConflictError(
+          "This member was updated elsewhere — refresh and retry.",
+        );
+      }
+
+      const updated: Member = {
+        ...existing,
+        ...member,
+        id,
+        guildId: existing.guildId,
+        version: existing.version + 1,
+      };
+      this.members.set(id, updated);
+      if (member.wallet && member.wallet !== existing.wallet) {
+        this.walletIndex.delete(this.walletKey(existing.guildId, existing.wallet));
+        this.walletIndex.set(this.walletKey(existing.guildId, member.wallet), id);
+      }
+
+      const changes = computeDiff(
+        existing as unknown as Record<string, unknown>,
+        updated as unknown as Record<string, unknown>,
+      );
+      if (changes.length > 0) {
+        const hasRoleChange = changes.some((c) => c.field === "roles");
+        const eventType: ActivityEvent["type"] = hasRoleChange
+          ? "member.roles_changed"
+          : "member.left";
+        const desc = hasRoleChange
+          ? `${updated.name}'s roles changed`
+          : `Member ${updated.name} updated`;
+        await this.recordDiff(
+          existing as unknown as Record<string, unknown>,
+          updated as unknown as Record<string, unknown>,
+          eventType,
+          desc,
+          "member",
+          id,
+          updated.name,
+        );
+      }
+
+      return updated;
+    });
+  }
+
+  async delete(guildId: string, id: string): Promise<boolean> {
+    return this.writeLock.runExclusive(async () => {
+      const existing = this.getScoped(guildId, id);
+      if (!existing) return false;
+      this.walletIndex.delete(this.walletKey(existing.guildId, existing.wallet));
+      const deleted = this.members.delete(id);
+      if (deleted) {
+        await this.recordDiff(
+          existing as unknown as Record<string, unknown>,
+          {} as Record<string, unknown>,
+          "member.left",
+          `${existing.name} left`,
+          "member",
+          id,
+          existing.name,
+        );
+      }
+      return deleted;
+    });
+  }
+
+  async *streamAll(guildId: string, chunkSize = 500): AsyncIterable<Member[]> {
+    const members = Array.from(this.members.values()).filter(
+      (m) => m.guildId === guildId,
+    );
+
+    for (let i = 0; i < members.length; i += chunkSize) {
+      yield members.slice(i, i + chunkSize);
+    }
   }
 }
 
