@@ -17,7 +17,7 @@ export async function GET(request: Request): Promise<Response> {
   const guard = requireSessionAndPermission(request, "members:read");
   if (!guard.ok) return guard.response;
 
-  const guildId = getActiveGuildId();
+  const guildId = getActiveGuildId(request);
   const repo = getMemberRepository();
 
   const encoder = new TextEncoder();

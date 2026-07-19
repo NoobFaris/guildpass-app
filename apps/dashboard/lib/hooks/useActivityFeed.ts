@@ -14,6 +14,8 @@ interface UseActivityFeedOptions extends Omit<ActivityQuery, "cursor"> {
   refreshIntervalMs?: number;
   autoRefresh?: boolean;
   simulate?: boolean;
+  /** Tenant scope — when set, activity is filtered to this guild. */
+  guildId?: string;
 }
 
 interface UseActivityFeedResult {
@@ -51,6 +53,7 @@ function toActivityEvent(activity: Activity | ActivityEvent): ActivityEvent {
     actor: { name: activity.actor },
     timestamp: activity.timestamp,
     description: activity.description,
+    metadata: { guildId: activity.guildId },
     schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
   };
 }
@@ -66,6 +69,7 @@ export function useActivityFeed({
   refreshIntervalMs,
   autoRefresh = true,
   simulate = true,
+  guildId,
 }: UseActivityFeedOptions = {}): UseActivityFeedResult {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -83,7 +87,7 @@ export function useActivityFeed({
   const fallbackIntervalMs = refreshIntervalMs ?? config.intervalMs;
   const maxEvents = config.maxEvents;
 
-  const query = useMemo<ActivityQuery>(
+  const query = useMemo<ActivityQuery & { guildId?: string }>(
     () => ({
       limit,
       type,
@@ -92,8 +96,9 @@ export function useActivityFeed({
       entityType,
       actor: actor?.trim() || undefined,
       from,
+      guildId,
     }),
-    [limit, type, source, severity, entityType, actor, from]
+    [limit, type, source, severity, entityType, actor, from, guildId]
   );
 
   const hasFilters = Boolean(type || source || severity || entityType || actor?.trim() || from);
@@ -158,7 +163,7 @@ export function useActivityFeed({
       setError(null);
 
       if (simulateEvent && simulate && !hasFilters) {
-        prependLiveEvent(toActivityEvent(generateMockActivity()));
+        prependLiveEvent(toActivityEvent(generateMockActivity(guildId)));
       }
     } catch {
       if (version === queryVersion.current) {
@@ -167,7 +172,7 @@ export function useActivityFeed({
     } finally {
       if (version === queryVersion.current) setLoading(false);
     }
-  }, [hasFilters, prependLiveEvent, query, replaceEvents, simulate]);
+  }, [guildId, hasFilters, prependLiveEvent, query, replaceEvents, simulate]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);

@@ -7,7 +7,7 @@ import StatusBadge from "@/components/StatusBadge";
 import UnsupportedBanner from "@/components/UnsupportedBanner";
 import { ApiClientError, readApiResult } from "@/lib/api-client";
 import { getClientApiMode } from "@/lib/client-env";
-import { mockPasses, type Pass as MockPass } from "@/lib/mock-data";
+import type { Pass as MockPass } from "@/lib/mock-data";
 import {
   sortPasses,
   type PassSortColumn,
@@ -19,6 +19,9 @@ import { useSession } from "@/lib/hooks/useSession";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
 import { canManagePasses } from "@/lib/permissions";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useGuild } from "@/lib/guild/GuildProvider";
+import { guildFetch } from "@/lib/guild/api";
+import { getPassesForGuild } from "@/lib/data/guild-scoped";
 
 type ListState = "loading" | "loaded" | "unsupported" | "error";
 type PassStatusFilter = MockPass["status"] | "all";
@@ -39,13 +42,15 @@ export default function PassesPage() {
   const session = useSession();
   const canWrite = canManagePasses(session);
   const apiMode = getClientApiMode();
+  const { guildId, guild } = useGuild();
 
-  const [passes, setPasses] = useState<MockPass[]>(mockPasses.slice(0, PAGE_SIZE));
+  const seedPasses = getPassesForGuild(guildId);
+  const [passes, setPasses] = useState<MockPass[]>(seedPasses.slice(0, PAGE_SIZE));
   const [pagination, setPagination] = useState<PaginatedResult<MockPass>>({
     ...emptyPage,
-    items: mockPasses.slice(0, PAGE_SIZE),
-    total: mockPasses.length,
-    hasNextPage: mockPasses.length > PAGE_SIZE,
+    items: seedPasses.slice(0, PAGE_SIZE),
+    total: seedPasses.length,
+    hasNextPage: seedPasses.length > PAGE_SIZE,
   });
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [listState, setListState] = useState<ListState>("loading");
@@ -67,7 +72,20 @@ export default function PassesPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, status]);
+  }, [debouncedSearch, status, guildId]);
+
+  // Drop previous tenant's rows immediately so the UI never shows stale data.
+  useEffect(() => {
+    const seed = getPassesForGuild(guildId);
+    setPasses(seed.slice(0, PAGE_SIZE));
+    setPagination({
+      ...emptyPage,
+      items: seed.slice(0, PAGE_SIZE),
+      total: seed.length,
+      hasNextPage: seed.length > PAGE_SIZE,
+    });
+    previousPassesRef.current = seed.slice(0, PAGE_SIZE);
+  }, [guildId]);
 
   useEffect(() => {
     let mounted = true;
@@ -82,7 +100,7 @@ export default function PassesPage() {
         if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
         if (status !== "all") params.set("status", status);
 
-        const res = await fetch(`/api/passes?${params.toString()}`);
+        const res = await guildFetch(`/api/passes?${params.toString()}`, guildId);
         const data = await readApiResult<PaginatedResult<MockPass>>(res);
         if (!mounted) return;
 
@@ -97,6 +115,7 @@ export default function PassesPage() {
           return;
         }
         console.warn("Falling back to mock passes:", err);
+        // Keep guild-scoped seed data already applied on guild switch.
         setListState(apiMode === "live" ? "error" : "loaded");
       }
     }
@@ -105,11 +124,11 @@ export default function PassesPage() {
     return () => {
       mounted = false;
     };
-  }, [apiMode, debouncedSearch, page, status]);
+  }, [apiMode, debouncedSearch, page, status, guildId]);
 
   const updateMutation = useOptimisticMutation<MockPass, { id: string; data: Partial<MockPass> }>({
     mutationFn: async ({ id, data }) => {
-      const res = await fetch(`/api/passes?id=${id}`, {
+      const res = await guildFetch(`/api/passes?id=${id}`, guildId, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -178,7 +197,7 @@ export default function PassesPage() {
   };
 
   return (
-    <DashboardLayout title="Passes" session={session}>
+    <DashboardLayout title="Passes" subtitle={guild ? `Scoped to ${guild.name}` : undefined} session={session}>
       {listState === "unsupported" && <UnsupportedBanner resource="passes" />}
 
       {listState === "error" && (
@@ -256,7 +275,7 @@ export default function PassesPage() {
 
                   try {
                     setCreateLoading(true);
-                    const res = await fetch("/api/passes", {
+                    const res = await guildFetch("/api/passes", guildId, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({

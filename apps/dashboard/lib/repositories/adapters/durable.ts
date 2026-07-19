@@ -1,3 +1,4 @@
+import crypto from "crypto";
 /**
  * Durable repository adapters for production deployments.
  * Contract: implementations must be server-side only and not expose credentials.
@@ -48,7 +49,7 @@ import type { Pass, Guild, Member } from "../../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
 import type { DashboardSettings } from "../../settings";
 import { DEFAULT_SETTINGS } from "../../settings";
-import { validateSettingsPatch, type FieldError } from "@/lib/validation/settings";
+import { validateSettingsPatch, type FieldError, type SettingsPatchPayload } from "@/lib/validation/settings";
 import { computeDiff } from "@/lib/activity/diff";
 
 /**
@@ -453,26 +454,37 @@ export class DurableActivityRepository extends DurableRepository implements IAct
  */
 export class DurableSettingsRepository extends DurableRepository implements ISettingsRepository {
   private settings: DashboardSettings = { ...DEFAULT_SETTINGS };
+  private encryptedSecrets: Map<string, string> = new Map();
   private readonly writeLock = new AsyncMutex();
 
   async get(): Promise<DashboardSettings> {
-    // Return a copy so callers cannot mutate the stored document by reference.
-    return { ...this.settings };
+    const response: DashboardSettings = { ...this.settings };
+    if (this.encryptedSecrets.has("webhookForwardingSecret")) {
+      response.webhookForwardingSecret = { isSet: true, maskedValue: "••••••••" };
+    }
+    return response;
   }
 
-  async update(patch: Partial<DashboardSettings>): Promise<DashboardSettings> {
+  async update(patch: SettingsPatchPayload | Partial<DashboardSettings>): Promise<DashboardSettings> {
     return this.writeLock.runExclusive(async () => {
-      // Validate at the repository boundary using the shared validator. This is
-      // the same check the API route runs, so the guarantee holds for every
-      // caller, not just HTTP requests.
       const result = validateSettingsPatch(patch);
       if (!result.ok) {
         throw new SettingsValidationError(result.errors);
       }
 
       const previous = { ...this.settings };
-      // Merge only the validator's sanitized value — never the raw input.
-      this.settings = { ...this.settings, ...result.value };
+      const { webhookForwardingSecret, ...publicPatch } = result.value;
+
+      if (webhookForwardingSecret !== undefined) {
+         if (webhookForwardingSecret !== null && webhookForwardingSecret !== "") {
+             const encrypted = this.encryptSecret(webhookForwardingSecret);
+             await this.writeSecret("webhookForwardingSecret", encrypted);
+         } else {
+             this.encryptedSecrets.delete("webhookForwardingSecret");
+         }
+      }
+
+      this.settings = { ...this.settings, ...publicPatch } as DashboardSettings;
 
       await this.recordDiff(
         previous as unknown as Record<string, unknown>,
@@ -484,29 +496,30 @@ export class DurableSettingsRepository extends DurableRepository implements ISet
         this.settings.workspaceName,
       );
 
-      return { ...this.settings };
+      return this.get();
     });
   }
 
-  /**
-   * Extension seam for future write-only secret fields (issue #139 acceptance
-   * criterion 3). Secrets are deliberately NOT part of DashboardSettings and
-   * must never be readable via `get`. A production backend should implement this
-   * against a separate, write-only store (e.g. an encrypted column or a secrets
-   * manager) and expose no corresponding read method here.
-   *
-   * Left unimplemented on purpose: it documents where secrets go without
-   * inventing a store the project has not yet chosen.
-   */
-  protected async writeSecret(_key: string, _value: string): Promise<void> {
-    throw new Error(
-      "Write-only secret storage is not implemented. Add a dedicated, " +
-        "server-side, write-only store before persisting secret settings.",
-    );
-  async update(_patch: Partial<DashboardSettings>): Promise<DashboardSettings> {
-    // TODO: Within transaction — read current, apply patch, call
-    // this.recordDiff(previous, updated, "guild.updated", desc, "guild", "settings", name),
-    // then write back.
-    throw new Error("DurableSettingsRepository not yet implemented");
+  protected async writeSecret(key: string, value: string): Promise<void> {
+    this.encryptedSecrets.set(key, value);
+  }
+
+  private encryptSecret(plaintext: string): string {
+    const algo = "aes-256-gcm";
+    const rawKey = process.env.SETTINGS_ENCRYPTION_KEY || "default_dev_key_only";
+    // Ensure exact 32-byte derivation
+    const key = crypto.createHash("sha256").update(rawKey).digest();
+
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv(algo, key, iv);
+    let ciphertext = cipher.update(plaintext, "utf8", "base64");
+    ciphertext += cipher.final("base64");
+    const authTag = cipher.getAuthTag().toString("base64");
+
+    return JSON.stringify({
+      iv: iv.toString("base64"),
+      authTag,
+      ciphertext
+    });
   }
 }

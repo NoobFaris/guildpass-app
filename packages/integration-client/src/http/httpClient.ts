@@ -1,16 +1,26 @@
 import { type HttpRequestOptions, type TransportConfig, DEFAULT_RETRY_CONFIG } from "./http.types.js";
+import { CircuitBreaker, CircuitOpenError, type CircuitBreakerStatus } from "./circuitBreaker.js";
 
 export class HttpClient {
-private config: TransportConfig;
+  private config: TransportConfig;
+  private breaker?: CircuitBreaker;
 
-constructor(config: TransportConfig = {}) {
+  constructor(config: TransportConfig = {}) {
     this.config = {
       ...config,
       retry: config.retry === undefined ? DEFAULT_RETRY_CONFIG : config.retry,
     };
+    if (config.circuitBreaker) {
+      this.breaker = new CircuitBreaker(config.circuitBreaker);
+    }
   }
 
   async request(url: string, options: HttpRequestOptions = {}): Promise<Response> {
+    if (this.breaker && !this.breaker.canRequest()) {
+      const status = this.breaker.getStatus();
+      throw new CircuitOpenError(status.retryAt ?? Date.now());
+    }
+
     const {
       timeout = this.config.timeout,
       retry = this.config.retry,
@@ -50,15 +60,21 @@ constructor(config: TransportConfig = {}) {
         });
 
         if (response.ok || attempt >= maxAttempts || !this.isTransient(response.status)) {
+          if (this.breaker) {
+            if (response.ok || !this.isTransient(response.status)) {
+              this.breaker.recordSuccess();
+            } else {
+              this.breaker.recordFailure();
+            }
+          }
           return response;
         }
-
-        // Transient failure, prepare for retry
       } catch (error: any) {
         if (externalSignal?.aborted && (error === externalSignal.reason || error.name === "AbortError")) {
           throw externalSignal.reason ?? error;
         }
         if (attempt >= maxAttempts) {
+          this.breaker?.recordFailure();
           throw error;
         }
       } finally {
@@ -73,7 +89,12 @@ constructor(config: TransportConfig = {}) {
       }
     }
 
+    this.breaker?.recordFailure();
     throw new Error("Request failed after max attempts");
+  }
+
+  getStatus(): CircuitBreakerStatus | null {
+    return this.breaker ? this.breaker.getStatus() : null;
   }
 
   private isTransient(status: number): boolean {
