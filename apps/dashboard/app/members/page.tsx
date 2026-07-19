@@ -13,10 +13,13 @@ import { useSession } from "@/lib/hooks/useSession";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
 import { MEMBER_ROLES } from "@/lib/member-roles";
 import { toMembersCsv } from "@/lib/members-csv";
-import { mockMembers, type Member as MockMember } from "@/lib/mock-data";
+import type { Member as MockMember } from "@/lib/mock-data";
 import { canManageMembers } from "@/lib/permissions";
 import type { PaginatedResult } from "@/lib/repositories/types";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useGuild } from "@/lib/guild/GuildProvider";
+import { guildFetch } from "@/lib/guild/api";
+import { getMembersForGuild } from "@/lib/data/guild-scoped";
 
 
 type ListState = "loading" | "loaded" | "unsupported" | "error";
@@ -39,13 +42,15 @@ export default function MembersPage() {
   const session = useSession();
   const canWrite = canManageMembers(session);
   const apiMode = getClientApiMode();
+  const { guildId, guild } = useGuild();
 
-  const [members, setMembers] = useState<MockMember[]>(mockMembers.slice(0, PAGE_SIZE));
+  const seedMembers = getMembersForGuild(guildId);
+  const [members, setMembers] = useState<MockMember[]>(seedMembers.slice(0, PAGE_SIZE));
   const [pagination, setPagination] = useState<PaginatedResult<MockMember>>({
     ...emptyPage,
-    items: mockMembers.slice(0, PAGE_SIZE),
-    total: mockMembers.length,
-    hasNextPage: mockMembers.length > PAGE_SIZE,
+    items: seedMembers.slice(0, PAGE_SIZE),
+    total: seedMembers.length,
+    hasNextPage: seedMembers.length > PAGE_SIZE,
   });
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [listState, setListState] = useState<ListState>("loading");
@@ -62,7 +67,20 @@ export default function MembersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, role, status]);
+  }, [debouncedSearch, role, status, guildId]);
+
+  // Drop previous tenant's rows immediately so the UI never shows stale data.
+  useEffect(() => {
+    const seed = getMembersForGuild(guildId);
+    setMembers(seed.slice(0, PAGE_SIZE));
+    setPagination({
+      ...emptyPage,
+      items: seed.slice(0, PAGE_SIZE),
+      total: seed.length,
+      hasNextPage: seed.length > PAGE_SIZE,
+    });
+    previousMembersRef.current = seed.slice(0, PAGE_SIZE);
+  }, [guildId]);
 
   useEffect(() => {
     let mounted = true;
@@ -78,7 +96,7 @@ export default function MembersPage() {
         if (status !== "all") params.set("status", status);
         if (role !== "all") params.set("role", role);
 
-        const res = await fetch(`/api/members?${params.toString()}`);
+        const res = await guildFetch(`/api/members?${params.toString()}`, guildId);
         const data = await readApiResult<PaginatedResult<MockMember>>(res);
         if (!mounted) return;
 
@@ -93,6 +111,7 @@ export default function MembersPage() {
           return;
         }
         console.warn("Falling back to mock members:", err);
+        // Keep guild-scoped seed data already applied on guild switch.
         setListState(apiMode === "live" ? "error" : "loaded");
       }
     }
@@ -101,11 +120,11 @@ export default function MembersPage() {
     return () => {
       mounted = false;
     };
-  }, [apiMode, debouncedSearch, page, role, status]);
+  }, [apiMode, debouncedSearch, page, role, status, guildId]);
 
   const updateMutation = useOptimisticMutation<MockMember, { id: string; data: Partial<MockMember> }>({
     mutationFn: async ({ id, data }) => {
-      const res = await fetch(`/api/members?id=${id}`, {
+      const res = await guildFetch(`/api/members?id=${id}`, guildId, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -140,7 +159,7 @@ export default function MembersPage() {
 
   const deleteMutation = useOptimisticMutation<{ success: boolean }, string>({
     mutationFn: async (id) => {
-      const res = await fetch(`/api/members?id=${id}`, { method: "DELETE" });
+      const res = await guildFetch(`/api/members?id=${id}`, guildId, { method: "DELETE" });
       return readApiResult<{ success: boolean }>(res);
     },
     onOptimisticUpdate: (id) => {
@@ -199,7 +218,7 @@ export default function MembersPage() {
   };
 
   return (
-    <DashboardLayout title="Members" session={session}>
+    <DashboardLayout title="Members" subtitle={guild ? `Scoped to ${guild.name}` : undefined} session={session}>
       {listState === "unsupported" && <UnsupportedBanner resource="members" />}
 
       {listState === "error" && (
@@ -323,7 +342,7 @@ export default function MembersPage() {
 
                   try {
                     setInviteLoading(true);
-                    const res = await fetch("/api/members", {
+                    const res = await guildFetch("/api/members", guildId, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ name: form.name.trim(), wallet: form.wallet.trim() }),
