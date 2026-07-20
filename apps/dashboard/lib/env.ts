@@ -1,32 +1,23 @@
-﻿export const env = {
-  GUILD_PASS_CORE_URL: process.env.GUILD_PASS_CORE_URL,
-  GUILD_PASS_CORE_API_KEY: process.env.GUILD_PASS_CORE_API_KEY,
-  WEBHOOK_SECRET: process.env.WEBHOOK_SECRET,
-  WEBHOOK_SECRET_PREVIOUS: process.env.WEBHOOK_SECRET_PREVIOUS,
-  ACTIVITY_STORAGE_MODE: process.env.ACTIVITY_STORAGE_MODE,
-  ACTIVITY_STORAGE_DIR: process.env.ACTIVITY_STORAGE_DIR,
-  // API mode for dashboard: 'mock' (default) or 'live'
-  DASHBOARD_API_MODE: process.env.DASHBOARD_API_MODE || "mock",
-  // Storage mode for data persistence: 'mock' (default, in-memory) or 'durable' (backend)
-  DASHBOARD_STORAGE_MODE: process.env.DASHBOARD_STORAGE_MODE || "mock",
-  // Storage connection string (required when DASHBOARD_STORAGE_MODE is 'durable')
-  DATABASE_URL: process.env.DATABASE_URL,
+﻿import { PublicApiError } from "./api-errors";
+
+export const env = {
+GUILD_PASS_CORE_URL: process.env.GUILD_PASS_CORE_URL,
+GUILD_PASS_CORE_API_KEY: process.env.GUILD_PASS_CORE_API_KEY,
+WEBHOOK_SECRET: process.env.WEBHOOK_SECRET,
+WEBHOOK_SECRET_PREVIOUS: process.env.WEBHOOK_SECRET_PREVIOUS,
+ACTIVITY_STORAGE_MODE: process.env.ACTIVITY_STORAGE_MODE,
+ACTIVITY_STORAGE_DIR: process.env.ACTIVITY_STORAGE_DIR,
+DASHBOARD_API_MODE: process.env.DASHBOARD_API_MODE || "mock",
+DASHBOARD_STORAGE_MODE: process.env.DASHBOARD_STORAGE_MODE || "mock",
+DATABASE_URL: process.env.DATABASE_URL,
 };
 
-/**
- * Activity refresh configuration.
- *
- * All values can be controlled via environment variables so operators can tune
- * polling behaviour without code changes.
- */
 export interface ActivityRefreshConfig {
-  /** Polling interval in milliseconds. Set to 0 to disable auto-polling. */
-  intervalMs: number;
-  /** Maximum number of events to keep in the client feed. */
-  maxEvents: number;
+intervalMs: number;
+maxEvents: number;
 }
 
-const DEFAULT_REFRESH_MS = 15_000; // 15 seconds
+const DEFAULT_REFRESH_MS = 15_000; 
 const DEFAULT_MAX_EVENTS = 500;
 
 export function getActivityRefreshConfig(): ActivityRefreshConfig {
@@ -98,11 +89,6 @@ export function getEnv() {
   const apiMode = getApiMode();
   const storageMode = getStorageMode();
 
-  // Only require core URL when running in live mode
-  if (apiMode === "live" && !GUILD_PASS_CORE_URL) {
-    throw new Error("GUILD_PASS_CORE_URL is not set (required for live mode)");
-  }
-
   return {
     GUILD_PASS_CORE_URL,
     GUILD_PASS_CORE_API_KEY,
@@ -112,5 +98,27 @@ export function getEnv() {
     ACTIVITY_STORAGE_DIR,
     apiMode,
     storageMode,
+  };
+}
+
+export function validateLiveModeEnv() {
+  const envVars = getEnv();
+  const missing: string[] = [];
+
+  if (!envVars.GUILD_PASS_CORE_URL) missing.push("GUILD_PASS_CORE_URL");
+  if (!envVars.GUILD_PASS_CORE_API_KEY) missing.push("GUILD_PASS_CORE_API_KEY");
+  if (!envVars.WEBHOOK_SECRET) missing.push("WEBHOOK_SECRET");
+
+  if (missing.length > 0) {
+    throw new PublicApiError(
+      `Missing required environment variables for live mode: ${missing.join(", ")}`,
+      500
+    );
+  }
+
+  return {
+    GUILD_PASS_CORE_URL: envVars.GUILD_PASS_CORE_URL as string,
+    GUILD_PASS_CORE_API_KEY: envVars.GUILD_PASS_CORE_API_KEY as string,
+    WEBHOOK_SECRET: envVars.WEBHOOK_SECRET as string,
   };
 }

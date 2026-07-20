@@ -47,8 +47,9 @@ export type PassCreateData = Omit<Pass, "id" | "createdAt" | "guildId">;
  */
 export type PassUpdateData = Partial<Omit<Pass, "id" | "guildId">>;
 
-/** Create input for a member. See {@link PassCreateData} for the rationale. */
-export type MemberCreateData = Omit<Member, "id" | "guildId">;
+/** Create input for a member. See {@link PassCreateData} for the rationale.
+ * `version` is excluded — the server always initializes it to 1. */
+export type MemberCreateData = Omit<Member, "id" | "guildId" | "version">;
 
 /** Update input for a member. See {@link PassUpdateData} for the rationale. */
 export type MemberUpdateData = Partial<Omit<Member, "id" | "guildId">>;
@@ -170,14 +171,28 @@ export interface IMemberRepository {
   /**
    * Update a member. Returns null when the member does not exist
    * or belongs to a different guild. The owning guild can never change.
+   *
+   * When `expectedVersion` is provided the update is only applied when the
+   * stored version matches — a mismatch results in a thrown ConflictError
+   * rather than a silent overwrite.
    */
-  update(guildId: string, id: string, member: MemberUpdateData): Promise<Member | null>;
+  update(guildId: string, id: string, member: MemberUpdateData, expectedVersion?: number): Promise<Member | null>;
 
   /**
    * Delete a member. Returns false when the member does not exist
    * or belongs to a different guild.
    */
   delete(guildId: string, id: string): Promise<boolean>;
+
+  /**
+   * Stream all members for a guild in bounded-size chunks.
+   *
+   * The async iterator yields pages internally (cursor-based when backed by
+   * a database); callers simply iterate without managing cursors. Never
+   * materializes the full result set — each page is fetched on demand so
+   * memory usage stays proportional to `chunkSize`, not the total count.
+   */
+  streamAll(guildId: string, chunkSize?: number): AsyncIterable<Member[]>;
 }
 
 /**

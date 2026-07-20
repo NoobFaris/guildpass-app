@@ -2,7 +2,17 @@ import { Client, GatewayIntentBits, Events } from "discord.js";
 import { config, validateConfig } from "./config.js";
 import { RoleReconciliationQueue } from "./queue.js";
 import { reconcileMemberRoles, resolveDesiredRoles, type RoleMap } from "./roles.js";
+import { handleGuildStats } from "./commands/guild-stats.js";
 import type { Membership, VerificationResult } from "@guildpass/integration-client";
+
+// ── Guild stats type ───────────────────────────────────────────────────────
+
+export interface GuildStats {
+  totalMembers: number;
+  activeCount: number;
+  inactiveCount: number;
+  roleDistribution: Record<string, number>;
+}
 
 // ── Integration client interface ───────────────────────────────────────────
 // A minimal interface capturing the IntegrationClient methods used by the bot.
@@ -22,6 +32,10 @@ export interface BotIntegrationClient {
     wallet: string,
     options?: { signal?: AbortSignal },
   ): Promise<Membership | null>;
+  getGuildStats(
+    guildId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<GuildStats>;
 }
 
 // ── Intents ────────────────────────────────────────────────────────────────
@@ -236,6 +250,19 @@ export function createClient(options: BotOptions = {}): Client {
         return;
       }
 
+      case "guild-stats": {
+        await interaction.deferReply({ ephemeral: true });
+        try {
+          await handleGuildStats(interaction, integration);
+        } catch (err) {
+          console.error("[bot] /guild-stats error:", err);
+          await interaction.editReply(
+            "❌ Could not fetch guild stats. Please try again later.",
+          );
+        }
+        return;
+      }
+
       default:
         // Unknown command — silently ignore.
         return;
@@ -286,6 +313,17 @@ function createStubIntegrationClient(): BotIntegrationClient {
       _options?: { signal?: AbortSignal },
     ) {
       return null;
+    },
+    async getGuildStats(
+      _guildId: string,
+      _options?: { signal?: AbortSignal },
+    ): Promise<GuildStats> {
+      return {
+        totalMembers: 0,
+        activeCount: 0,
+        inactiveCount: 0,
+        roleDistribution: {},
+      };
     },
   };
 }

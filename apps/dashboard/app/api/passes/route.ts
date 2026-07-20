@@ -38,10 +38,10 @@ export async function GET(
 
     try {
       const passRepository = getPassRepository();
-      return await passRepository.query(getActiveGuildId(), query);
+      return await passRepository.query(getActiveGuildId(request), query);
     } catch (error) {
       console.error("Error fetching passes:", error);
-      return getFallbackPasses(query);
+      return getFallbackPasses(request, query);
     }
   });
 }
@@ -63,8 +63,8 @@ function isPassStatus(value: string | null): value is Pass["status"] {
   return value !== null && PASS_STATUSES.includes(value as Pass["status"]);
 }
 
-function getFallbackPasses(query: PassListQuery) {
-  const guildId = getActiveGuildId();
+function getFallbackPasses(request: Request, query: PassListQuery) {
+  const guildId = getActiveGuildId(request);
   const scoped = mockPasses.filter((pass) => pass.guildId === guildId);
   const filtered = filterPasses(scoped, query);
   return paginateItems(filtered, query);
@@ -89,7 +89,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const passRepository = getPassRepository();
-    const created = await passRepository.create(getActiveGuildId(), validation.data);
+    const created = await passRepository.create(getActiveGuildId(request), validation.data);
     await recordDashboardActivity({
       type: "pass.created",
       entity: { type: "pass", id: created.id, name: created.name },
@@ -127,7 +127,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     }
 
     const passRepository = getPassRepository();
-    const updated = await passRepository.update(getActiveGuildId(), id, validation.data);
+    const updated = await passRepository.update(getActiveGuildId(request), id, validation.data);
     if (!updated) throw new NotFoundError("Pass not found.");
     await recordDashboardActivity({
       type: "pass.updated",
@@ -154,7 +154,7 @@ export async function DELETE(request: Request): Promise<NextResponse> {
 
   return handleApiError(async () => {
     const passRepository = getPassRepository();
-    const guildId = getActiveGuildId();
+    const guildId = getActiveGuildId(request);
     const pass = await passRepository.getById(guildId, id);
     if (!pass) throw new NotFoundError("Pass not found.");
     const success = await passRepository.delete(guildId, id);

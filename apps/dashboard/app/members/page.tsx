@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import DashboardLayout from "@/components/DashboardLayout";
 import EmptyState from "@/components/EmptyState";
@@ -13,10 +13,13 @@ import { useSession } from "@/lib/hooks/useSession";
 import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
 import { MEMBER_ROLES } from "@/lib/member-roles";
 import { toMembersCsv } from "@/lib/members-csv";
-import { mockMembers, type Member as MockMember } from "@/lib/mock-data";
+import type { Member as MockMember } from "@/lib/mock-data";
 import { canManageMembers } from "@/lib/permissions";
 import type { PaginatedResult } from "@/lib/repositories/types";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useGuild } from "@/lib/guild/GuildProvider";
+import { guildFetch } from "@/lib/guild/api";
+import { getMembersForGuild } from "@/lib/data/guild-scoped";
 
 
 type ListState = "loading" | "loaded" | "unsupported" | "error";
@@ -39,13 +42,15 @@ export default function MembersPage() {
   const session = useSession();
   const canWrite = canManageMembers(session);
   const apiMode = getClientApiMode();
+  const { guildId, guild } = useGuild();
 
-  const [members, setMembers] = useState<MockMember[]>(mockMembers.slice(0, PAGE_SIZE));
+  const seedMembers = getMembersForGuild(guildId);
+  const [members, setMembers] = useState<MockMember[]>(seedMembers.slice(0, PAGE_SIZE));
   const [pagination, setPagination] = useState<PaginatedResult<MockMember>>({
     ...emptyPage,
-    items: mockMembers.slice(0, PAGE_SIZE),
-    total: mockMembers.length,
-    hasNextPage: mockMembers.length > PAGE_SIZE,
+    items: seedMembers.slice(0, PAGE_SIZE),
+    total: seedMembers.length,
+    hasNextPage: seedMembers.length > PAGE_SIZE,
   });
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [listState, setListState] = useState<ListState>("loading");
@@ -62,7 +67,20 @@ export default function MembersPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, role, status]);
+  }, [debouncedSearch, role, status, guildId]);
+
+  // Drop previous tenant's rows immediately so the UI never shows stale data.
+  useEffect(() => {
+    const seed = getMembersForGuild(guildId);
+    setMembers(seed.slice(0, PAGE_SIZE));
+    setPagination({
+      ...emptyPage,
+      items: seed.slice(0, PAGE_SIZE),
+      total: seed.length,
+      hasNextPage: seed.length > PAGE_SIZE,
+    });
+    previousMembersRef.current = seed.slice(0, PAGE_SIZE);
+  }, [guildId]);
 
   useEffect(() => {
     let mounted = true;
@@ -78,7 +96,7 @@ export default function MembersPage() {
         if (status !== "all") params.set("status", status);
         if (role !== "all") params.set("role", role);
 
-        const res = await fetch(`/api/members?${params.toString()}`);
+        const res = await guildFetch(`/api/members?${params.toString()}`, guildId);
         const data = await readApiResult<PaginatedResult<MockMember>>(res);
         if (!mounted) return;
 
@@ -93,6 +111,7 @@ export default function MembersPage() {
           return;
         }
         console.warn("Falling back to mock members:", err);
+        // Keep guild-scoped seed data already applied on guild switch.
         setListState(apiMode === "live" ? "error" : "loaded");
       }
     }
@@ -101,11 +120,11 @@ export default function MembersPage() {
     return () => {
       mounted = false;
     };
-  }, [apiMode, debouncedSearch, page, role, status]);
+  }, [apiMode, debouncedSearch, page, role, status, guildId]);
 
-  const updateMutation = useOptimisticMutation<MockMember, { id: string; data: Partial<MockMember> }>({
+  const updateMutation = useOptimisticMutation<MockMember, { id: string; data: Partial<MockMember> & { version?: number } }>({
     mutationFn: async ({ id, data }) => {
-      const res = await fetch(`/api/members?id=${id}`, {
+      const res = await guildFetch(`/api/members?id=${id}`, guildId, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -134,13 +153,17 @@ export default function MembersPage() {
       });
     },
     onError: (error) => {
-      alert(error.message);
+      if (error instanceof ApiClientError && error.code === "CONFLICT") {
+        alert("This member was updated elsewhere — refresh and retry.");
+      } else {
+        alert(error.message);
+      }
     },
   });
 
   const deleteMutation = useOptimisticMutation<{ success: boolean }, string>({
     mutationFn: async (id) => {
-      const res = await fetch(`/api/members?id=${id}`, { method: "DELETE" });
+      const res = await guildFetch(`/api/members?id=${id}`, guildId, { method: "DELETE" });
       return readApiResult<{ success: boolean }>(res);
     },
     onOptimisticUpdate: (id) => {
@@ -181,7 +204,8 @@ export default function MembersPage() {
   };
 
   const handleRolesChange = (id: string, roles: string[]) => {
-    updateMutation.mutate({ id, data: { roles } });
+    const member = members.find((m) => m.id === id);
+    updateMutation.mutate({ id, data: { roles, version: member?.version } });
   };
 
   const handleExportCsv = () => {
@@ -199,7 +223,7 @@ export default function MembersPage() {
   };
 
   return (
-    <DashboardLayout title="Members" session={session}>
+    <DashboardLayout title="Members" subtitle={guild ? `Scoped to ${guild.name}` : undefined} session={session}>
       {listState === "unsupported" && <UnsupportedBanner resource="members" />}
 
       {listState === "error" && (
@@ -240,46 +264,65 @@ export default function MembersPage() {
       </div>
 
       {listState !== "unsupported" && (
-        <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_180px_180px]">
-          <label className="block">
-            <span className="sr-only">Search members</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by name or wallet"
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-            />
-          </label>
+        <div className="mb-4 space-y-3">
+          {/* Search + Status row */}
+          <div className="grid gap-3 lg:grid-cols-[1fr_180px]">
+            <label className="block">
+              <span className="sr-only">Search members</span>
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search by name or wallet"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+              />
+            </label>
 
-          <label className="block">
-            <span className="sr-only">Filter by status</span>
-            <select
-              value={status}
-              onChange={(event) => setStatus(event.target.value as MemberStatusFilter)}
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-            >
-              <option value="all">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="pending">Pending</option>
-            </select>
-          </label>
+            <label className="block">
+              <span className="sr-only">Filter by status</span>
+              <select
+                value={status}
+                onChange={(event) => setStatus(event.target.value as MemberStatusFilter)}
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="pending">Pending</option>
+              </select>
+            </label>
+          </div>
 
-          <label className="block">
-            <span className="sr-only">Filter by role</span>
-            <select
-              value={role}
-              onChange={(event) => setRole(event.target.value as MemberRoleFilter)}
-              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+          {/* Role filter chips */}
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filter by role">
+            <span className="text-sm text-slate-500">Role:</span>
+            <button
+              type="button"
+              onClick={() => setRole("all")}
+              aria-pressed={role === "all"}
+              className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 ${
+                role === "all"
+                  ? "bg-violet-600 text-white border-violet-600"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
             >
-              <option value="all">All roles</option>
-              {MEMBER_ROLES.map((memberRole) => (
-                <option key={memberRole} value={memberRole}>
-                  {memberRole}
-                </option>
-              ))}
-            </select>
-          </label>
+              All
+            </button>
+            {MEMBER_ROLES.map((memberRole) => (
+              <button
+                key={memberRole}
+                type="button"
+                onClick={() => setRole(memberRole)}
+                aria-pressed={role === memberRole}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors focus:outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 ${
+                  role === memberRole
+                    ? "bg-violet-600 text-white border-violet-600"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {memberRole}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -304,7 +347,7 @@ export default function MembersPage() {
 
                   try {
                     setInviteLoading(true);
-                    const res = await fetch("/api/members", {
+                    const res = await guildFetch("/api/members", guildId, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ name: form.name.trim(), wallet: form.wallet.trim() }),

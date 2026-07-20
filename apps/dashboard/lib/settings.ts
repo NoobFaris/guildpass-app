@@ -9,6 +9,14 @@
 
 import { SUPPORTED_TIMEZONES } from "@/lib/timezones";
 
+export const SECRET_MASK = "••••••••";
+
+export interface WriteOnlySecret {
+  readonly isSet: boolean;
+  readonly maskedValue: typeof SECRET_MASK;
+  readonly __secretBrand?: never;
+}
+
 export interface DashboardSettings {
   /** Display name of the workspace. */
   workspaceName: string;

@@ -1,6 +1,6 @@
 import type { Member } from "./mock-data";
 
-const MEMBER_CSV_HEADERS = ["Name", "Wallet", "Status", "Roles", "Joined At", "Last Active"];
+export const MEMBER_CSV_HEADERS = ["Name", "Wallet", "Status", "Roles", "Joined At", "Last Active"];
 
 function escapeCsvCell(value: string): string {
   if (/[",\r\n]/.test(value)) {
@@ -10,17 +10,21 @@ function escapeCsvCell(value: string): string {
   return value;
 }
 
-export function toMembersCsv(members: Member[]): string {
-  const rows = members.map((member) => [
+/** Serialize a single member to a CSV row (no trailing newline). */
+export function memberToCsvRow(member: Member): string {
+  return [
     member.name,
     member.wallet,
     member.status,
     (member.roles ?? []).join("; "),
     member.joinedAt,
     member.lastActive,
-  ]);
+  ]
+    .map((cell) => escapeCsvCell(String(cell)))
+    .join(",");
+}
 
-  return [MEMBER_CSV_HEADERS, ...rows]
-    .map((row) => row.map((cell) => escapeCsvCell(String(cell))).join(","))
-    .join("\r\n");
+/** Serialize an array of members to a full CSV string including headers. */
+export function toMembersCsv(members: Member[]): string {
+  return [MEMBER_CSV_HEADERS.join(","), ...members.map(memberToCsvRow)].join("\r\n");
 }
