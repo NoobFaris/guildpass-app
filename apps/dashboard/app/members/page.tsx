@@ -40,7 +40,7 @@ const emptyPage: PaginatedResult<MockMember> = {
 
 export default function MembersPage() {
   const session = useSession();
-  const canWrite = canManageMembers(session);
+  const canWrite = canManageMembers(session, session.activeGuildId);
   const apiMode = getClientApiMode();
   const { guildId, guild } = useGuild();
 

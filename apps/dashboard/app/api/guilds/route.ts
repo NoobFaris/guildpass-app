@@ -10,6 +10,7 @@ import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { getApiMode } from "@/lib/env";
 import { getGuildRepository } from "@/lib/repositories/factory";
 import { recordDashboardActivity } from "@/lib/activity/dashboard";
+import { getActiveGuildId } from "@/lib/guild-context";
 
 export async function GET(): Promise<NextResponse> {
   return handleApiError(async () => {
@@ -72,7 +73,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return { message: "Guild created (stub)" };
 export async function POST(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "guilds:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "guilds:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 
@@ -100,10 +101,6 @@ export async function POST(request: Request): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "guilds:write");
-  if (!guard.ok) return guard.response;
-  const { session } = guard;
-
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
@@ -112,6 +109,9 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       { field: "id", message: "id query parameter is required" },
     ]);
   }
+  const guard = await requireSessionAndPermission(request, id, "guilds:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   return handleApiError(async () => {
     const body = await request.json();
@@ -128,10 +128,6 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 }
 
 export async function DELETE(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "guilds:write");
-  if (!guard.ok) return guard.response;
-  const { session } = guard;
-
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
@@ -140,6 +136,9 @@ export async function DELETE(request: Request): Promise<NextResponse> {
       { field: "id", message: "id query parameter is required" },
     ]);
   }
+  const guard = await requireSessionAndPermission(request, id, "guilds:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
 
   return handleApiError(async () => {
     const guildRepository = getGuildRepository();

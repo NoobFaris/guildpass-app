@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { apiValidationError, handleApiError } from "@/lib/api-helpers";
-import { MOCK_API_SESSION } from "@/lib/auth/session";
-import { guardPermission, requireSessionAndPermission } from "@/lib/auth/require-permission";
+import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { getSettingsRepository } from "@/lib/repositories/factory";
 import { validateSettingsPatch } from "@/lib/validation/settings";
 import { recordDashboardActivity } from "@/lib/activity/dashboard";
+import { getActiveGuildId } from "@/lib/guild-context";
 
-export async function GET(): Promise<NextResponse> {
-  const guard = guardPermission(MOCK_API_SESSION, "settings:read");
+export async function GET(request: Request): Promise<NextResponse> {
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "settings:read");
   if (!guard.ok) return guard.response;
 
   return handleApiError(async () => {
@@ -16,7 +16,7 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "settings:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "settings:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 

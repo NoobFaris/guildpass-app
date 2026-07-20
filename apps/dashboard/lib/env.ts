@@ -17,7 +17,7 @@ intervalMs: number;
 maxEvents: number;
 }
 
-const DEFAULT_REFRESH_MS = 15_000; 
+const DEFAULT_REFRESH_MS = 15_000;
 const DEFAULT_MAX_EVENTS = 500;
 
 export function getActivityRefreshConfig(): ActivityRefreshConfig {
