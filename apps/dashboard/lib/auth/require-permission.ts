@@ -25,13 +25,14 @@ export type PermissionGuardResult =
  */
 export function guardPermission(
   session: Session,
+  guildId: string,
   permission: Permission
 ): PermissionGuardResult {
   try {
-    assertPermission(session, permission);
+    assertPermission(session, guildId, permission);
   } catch (err) {
     if (err instanceof PermissionDeniedError) {
-      recordPermissionDenied(session, permission);
+      recordPermissionDenied(session, guildId, permission);
       return { ok: false, response: apiError(err.message, 403) };
     }
     throw err;
@@ -45,18 +46,19 @@ export function guardPermission(
  *
  * @example
  * ```ts
- * const guard = requireSessionAndPermission(request, "passes:write");
+ * const guard = await requireSessionAndPermission(request, guildId, "passes:write");
  * if (!guard.ok) return guard.response;
  * const { session } = guard;
  * ```
  */
-export function requireSessionAndPermission(
+export async function requireSessionAndPermission(
   request: Request,
+  guildId: string,
   permission: Permission
-): PermissionGuardResult {
+): Promise<PermissionGuardResult> {
   let session: Session;
   try {
-    session = requireDashboardSession(request);
+    session = await requireDashboardSession(request);
   } catch (err) {
     if (err instanceof UnauthorizedError) {
       return { ok: false, response: apiError(err.message, 401) };
@@ -64,16 +66,16 @@ export function requireSessionAndPermission(
     throw err;
   }
 
-  return guardPermission(session, permission);
+  return guardPermission(session, guildId, permission);
 }
 
-function recordPermissionDenied(session: Session, permission: Permission): void {
+function recordPermissionDenied(session: Session, guildId: string, permission: Permission): void {
   void recordDashboardActivity({
     type: "activity.permission_denied",
     severity: "warning",
     actor: { id: session.userId, name: session.name },
     description: `Permission denied: "${permission}" is required for this action.`,
-    metadata: { permission, role: session.role },
+    metadata: { permission, guildId, role: session.roles[guildId] ?? null },
   }).catch((err) => {
     console.error("Failed to record permission_denied activity event:", err);
   });

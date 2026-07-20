@@ -31,6 +31,7 @@
 
 import type { Session, Role, Permission } from "./session";
 import { ROLE_PERMISSIONS } from "./session";
+import { DEFAULT_GUILD_ID } from "@/lib/mock-data";
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -313,6 +314,8 @@ export function createSessionStore(): SessionStore {
       return {
         userId: payload.sub,
         name: payload.name,
+        roles: { [DEFAULT_GUILD_ID]: payload.role },
+        activeGuildId: DEFAULT_GUILD_ID,
         role: payload.role,
         permissions: payload.permissions,
       };

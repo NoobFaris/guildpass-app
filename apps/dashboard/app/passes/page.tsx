@@ -40,7 +40,7 @@ const emptyPage: PaginatedResult<MockPass> = {
 
 export default function PassesPage() {
   const session = useSession();
-  const canWrite = canManagePasses(session);
+  const canWrite = canManagePasses(session, session.activeGuildId);
   const apiMode = getClientApiMode();
   const { guildId, guild } = useGuild();
 

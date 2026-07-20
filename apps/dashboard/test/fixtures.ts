@@ -8,6 +8,7 @@
 import type { ActivityEvent } from "../lib/activity/types";
 import { CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 import type { Session } from "../lib/auth/session";
+import { DEFAULT_GUILD_ID } from "../lib/mock-data";
 import type { WebhookPayload } from "../lib/activity/types";
 
 export const FIXED_TIMESTAMP = "2025-01-15T12:00:00.000Z";
@@ -97,13 +98,19 @@ export const WEBHOOK_FIXTURES: Record<string, WebhookPayload> = {
 export const SESSION_ADMIN: Session = {
   userId: "test-admin-001",
   name: "Test Admin",
+  roles: { [DEFAULT_GUILD_ID]: "admin" },
+  activeGuildId: DEFAULT_GUILD_ID,
   role: "admin",
+  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "settings:read", "settings:write"],
+  csrfToken: "mock-csrf-token-for-development-only",
   permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "activity:read", "settings:read", "settings:write"],
 };
 
 export const SESSION_MODERATOR: Session = {
   userId: "test-mod-001",
   name: "Test Moderator",
+  roles: { [DEFAULT_GUILD_ID]: "moderator" },
+  activeGuildId: DEFAULT_GUILD_ID,
   role: "moderator",
   permissions: ["passes:read", "members:read", "members:write", "guilds:read", "activity:read", "settings:read"],
 };
@@ -111,6 +118,8 @@ export const SESSION_MODERATOR: Session = {
 export const SESSION_READONLY: Session = {
   userId: "test-readonly-001",
   name: "Test Viewer",
+  roles: { [DEFAULT_GUILD_ID]: "readonly" },
+  activeGuildId: DEFAULT_GUILD_ID,
   role: "readonly",
   permissions: ["passes:read", "members:read", "guilds:read", "activity:read", "settings:read"],
 };
@@ -118,7 +127,11 @@ export const SESSION_READONLY: Session = {
 export const SESSION_OWNER: Session = {
   userId: "test-owner-001",
   name: "Test Owner",
+  roles: { [DEFAULT_GUILD_ID]: "owner" },
+  activeGuildId: DEFAULT_GUILD_ID,
   role: "owner",
+  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "settings:read", "settings:write"],
+  csrfToken: "mock-csrf-token-for-development-only",
   permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "activity:read", "settings:read", "settings:write"],
 };
 

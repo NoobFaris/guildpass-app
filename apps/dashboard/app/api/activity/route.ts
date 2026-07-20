@@ -36,7 +36,7 @@ function mockActivityToEvent(activity: Activity): ActivityEvent {
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "activity:read");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "activity:read");
   if (!guard.ok) return guard.response;
 
   const url = new URL(request.url);

@@ -138,6 +138,27 @@ export async function getDashboardSession(request: Request): Promise<Session> {
 /**
  * Like `getDashboardSession`, but semantically asserts that the caller
  * requires a valid session. Throws `UnauthorizedError` if resolution fails.
+ *
+ * This is the primary function API route handlers should use before
+ * proceeding with permission checks.
+ *
+ * @example
+ * ```ts
+ * import { requireDashboardSession, UnauthorizedError } from "@/lib/auth/server-session";
+ * import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+ *
+ * export async function POST(request: Request) {
+ *   try {
+ *     const session = await requireDashboardSession(request);
+ *     assertPermission(session, guildId, "passes:write");
+ *   } catch (err) {
+ *     if (err instanceof PermissionDeniedError) return apiError(err.message, 403);
+ *     if (err instanceof UnauthorizedError)    return apiError(err.message, 401);
+ *     throw err;
+ *   }
+ *   // ... handle the mutation
+ * }
+ * ```
  */
 export async function requireDashboardSession(request: Request): Promise<Session> {
   return getDashboardSession(request);

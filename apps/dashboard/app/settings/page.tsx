@@ -34,7 +34,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 
 export default function SettingsPage() {
   const session = useSession();
-  const canEdit = canEditSettings(session);
+  const canEdit = canEditSettings(session, session.activeGuildId);
   const [workspaceName, setWorkspaceName] = useState("GuildPass DAO");
   const [timezone, setTimezone] = useState("UTC");
   const [displayName, setDisplayName] = useState(session.name);

@@ -9,6 +9,7 @@ import {
 import { mainnet } from "viem/chains";
 import { PrismaClient } from "@prisma/client";
 import { MEMBERSHIP_ABI, MEMBERSHIP_EVENTS } from "@guildpass/contracts";
+import { LeaderElectionService } from "../utils/leader-election.js";
 
 export interface IndexerConfig {
   rpcUrl: string;
@@ -62,6 +63,7 @@ export class IndexerCore {
   private client: PublicClient;
   protected config: IndexerConfig;
   protected db: PrismaClient;
+  protected leaderElection: LeaderElectionService | null = null;
 
   constructor(config: IndexerConfig, db?: PrismaClient) {
     this.config = config;
@@ -70,6 +72,10 @@ export class IndexerCore {
       chain: mainnet,
       transport: http(config.rpcUrl),
     });
+  }
+
+  attachLeaderElection(leaderElection: LeaderElectionService): void {
+    this.leaderElection = leaderElection;
   }
 
   getClient(): PublicClient {
@@ -202,7 +208,8 @@ export class IndexerCore {
       });
 
       await this.db.$transaction(async (tx) => {
-        await this.applyEventApplication(decoded, tx);
+        const previousState = await this.applyEventApplication(decoded, tx);
+        const fencingToken = this.leaderElection ? this.leaderElection.getGeneration() : 0;
 
         await tx.processedEvent.upsert({
           where: {
@@ -219,6 +226,8 @@ export class IndexerCore {
             status: "processed",
             eventType: decoded.eventName,
             data: decoded.args as any,
+            previousState,
+            fencingToken,
           },
           create: {
             contractAddress,
@@ -229,6 +238,8 @@ export class IndexerCore {
             status: "processed",
             eventType: decoded.eventName,
             data: decoded.args as any,
+            previousState,
+            fencingToken,
           },
         });
       });
@@ -399,19 +410,42 @@ export class IndexerCore {
 // ─── Live indexer: owns the poll loop and checkpoint ──────────────────────────
 
 export class MembershipIndexer extends IndexerCore {
+  private running = false;
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  attachLeaderElection(leaderElection: LeaderElectionService): void {
+    super.attachLeaderElection(leaderElection);
+  }
+
   async start() {
     console.log("Starting indexer...");
-    while (true) {
+    this.running = true;
+
+    while (this.running) {
       try {
         await this.poll();
       } catch (error) {
         console.error("Indexer processing cycle suspended:", error);
       }
-      await new Promise((resolve) => setTimeout(resolve, 10_000));
+      if (this.running) {
+        await new Promise((resolve) => setTimeout(resolve, 10_000));
+      }
+    }
+  }
+
+  stop(): void {
+    this.running = false;
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
     }
   }
 
   async poll() {
+    if (this.leaderElection) {
+      await this.leaderElection.verifyLeadershipOrThrow();
+    }
+
     const currentBlock = await this.getClient().getBlockNumber();
     const safeTip = currentBlock - BigInt(this.config.confirmationDepth);
 
@@ -439,10 +473,11 @@ export class MembershipIndexer extends IndexerCore {
       // If processRange hits a failed event block, it throws immediately, blocking this upsert.
       await this.processRange({ contractAddress, fromBlock, toBlock, dryRun: false });
 
+      const fencingToken = this.leaderElection ? this.leaderElection.getGeneration() : 0;
       await this.db.indexerCheckpoint.upsert({
         where: { contractAddress },
-        update: { lastBlock: toBlock },
-        create: { contractAddress, lastBlock: toBlock },
+        update: { lastBlock: toBlock, fencingToken },
+        create: { contractAddress, lastBlock: toBlock, fencingToken },
       });
     }
   }

@@ -8,6 +8,9 @@ handleApiError,
 } from "@/lib/api-helpers";
 import { NotFoundError } from "@/lib/api-errors";
 import { mockMembers, type Member } from "@/lib/mock-data";
+import { MOCK_API_SESSION } from "@/lib/auth/session";
+import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { assertCsrfToken, CsrfError } from "@/lib/auth/csrf";
 import { getActiveGuildId } from "@/lib/guild-context";
 import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { IntegrationClient } from "@guildpass/integration-client";
@@ -131,7 +134,7 @@ function getFallbackMembers(request: Request, query: MemberListQuery) {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "members:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "members:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 
@@ -160,7 +163,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "members:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "members:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 
@@ -204,7 +207,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 }
 
 export async function DELETE(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "members:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "members:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 
