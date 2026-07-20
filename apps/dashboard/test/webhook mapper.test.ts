@@ -1,5 +1,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
+import { WEBHOOK_FIXTURES, FIXED_UNIX, makeWebhookPayload } from "./fixtures";
+import type { ActivityEvent } from "../lib/activity/types";
+import type { WebhookPayload } from "../lib/activity/types";
 import { WEBHOOK_FIXTURES, makeWebhookPayload } from "./fixtures.ts";
 import type { ActivityEvent } from "../lib/activity/types.ts";
 import { CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
@@ -155,8 +158,8 @@ describe("mapWebhookToActivity", () => {
     });
 
     test("sets actor name and wallet from payload data", () => {
-      assert.equal(result.actor.name, payload.data.name);
-      assert.equal(result.actor.wallet, payload.data.wallet);
+      assert.equal(result.actor.name, payload.data.name!);
+      assert.equal(result.actor.wallet, payload.data.wallet!);
     });
 
     test("description includes member name when present", () => {
@@ -181,7 +184,7 @@ describe("mapWebhookToActivity", () => {
 
     test("entity type is 'member'", () => {
       assert.equal(result.entity?.type, "member");
-      assert.equal(result.entity?.id, payload.data.id);
+      assert.equal(result.entity?.id, payload.data.id!);
     });
 
     test("metadata equals raw payload data", () => {
@@ -240,7 +243,7 @@ describe("mapWebhookToActivity", () => {
 
     test("entity type is 'pass'", () => {
       assert.equal(result.entity?.type, "pass");
-      assert.equal(result.entity?.name, payload.data.name);
+      assert.equal(result.entity?.name, payload.data.name!);
     });
   });
 
@@ -306,7 +309,7 @@ describe("mapWebhookToActivity", () => {
     });
 
     test("actor.wallet is set from payload data.wallet", () => {
-      assert.equal(result.actor.wallet, payload.data.wallet);
+      assert.equal(result.actor.wallet, payload.data.wallet!);
     });
 
     test("description includes wallet address", () => {
@@ -315,7 +318,7 @@ describe("mapWebhookToActivity", () => {
 
     test("entity type is 'verification' and id equals wallet", () => {
       assert.equal(result.entity?.type, "verification");
-      assert.equal(result.entity?.id, payload.data.wallet);
+      assert.equal(result.entity?.id, payload.data.wallet!);
     });
   });
 

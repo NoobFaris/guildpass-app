@@ -1,3 +1,23 @@
+/**
+ * lib/auth/session.ts
+ *
+ * Defines the core permission model for the GuildPass dashboard.
+ *
+ * Contains:
+ *  - Role and Permission type unions
+ *  - Session interface (includes CSRF token field)
+ *  - ROLE_PERMISSIONS matrix — what each role is allowed to do
+ *  - Mock sessions for all four roles (dev/test use)
+ *  - MOCK_SESSION — the active mock session (change MOCK_ACTIVE_ROLE to switch)
+ *
+ * ⚠️  Production note: Replace MOCK_SESSION with a real auth call
+ *     (e.g. `getServerSession()` from next-auth, or a JWT decode) when
+ *     backend authentication is wired up.
+ */
+
+import { MOCK_CSRF_TOKEN } from "./csrf";
+
+// ── Roles ─────────────────────────────────────────────────────────────────────
 /** Guild-scoped authorization model for the dashboard. */
 
 import { DEFAULT_GUILD_ID } from "@/lib/mock-data";
@@ -25,6 +45,22 @@ export type GuildRoles = Record<string, Role>;
 export interface Session {
   userId: string;
   name: string;
+  /** The user's single assigned role */
+  role: Role;
+  /**
+   * Flat list of permissions granted to this session.
+   * Derived from ROLE_PERMISSIONS[role] at session-creation time so that
+   * individual permission checks are O(1) array includes.
+   */
+  permissions: Permission[];
+  /**
+   * CSRF token bound to this session.
+   * Used for the double-submit cookie pattern: the server sets this as a cookie,
+   * and the client reads the cookie and sends it back as an X-CSRF-Token header
+   * on every mutating request. This prevents cross-site request forgery attacks.
+   */
+  csrfToken: string;
+}
   roles: GuildRoles;
   /** Guild selected by the current dashboard context. */
   activeGuildId: string;
@@ -56,6 +92,34 @@ function createMockSession(role: Role, userId: string, name: string): Session {
 
 /** Single-guild mock sessions remain convenient for local development. */
 export const MOCK_SESSIONS: Record<Role, Session> = {
+  owner: {
+    userId: "mock-owner-001",
+    name: "Owner Alice",
+    role: "owner",
+    permissions: ROLE_PERMISSIONS.owner,
+    csrfToken: MOCK_CSRF_TOKEN,
+  },
+  admin: {
+    userId: "mock-admin-001",
+    name: "Admin Bob",
+    role: "admin",
+    permissions: ROLE_PERMISSIONS.admin,
+    csrfToken: MOCK_CSRF_TOKEN,
+  },
+  moderator: {
+    userId: "mock-moderator-001",
+    name: "Moderator Charlie",
+    role: "moderator",
+    permissions: ROLE_PERMISSIONS.moderator,
+    csrfToken: MOCK_CSRF_TOKEN,
+  },
+  readonly: {
+    userId: "mock-readonly-001",
+    name: "Viewer Diana",
+    role: "readonly",
+    permissions: ROLE_PERMISSIONS.readonly,
+    csrfToken: MOCK_CSRF_TOKEN,
+  },
   owner: createMockSession("owner", "mock-owner-001", "Owner Alice"),
   admin: createMockSession("admin", "mock-admin-001", "Admin Bob"),
   moderator: createMockSession("moderator", "mock-moderator-001", "Moderator Charlie"),

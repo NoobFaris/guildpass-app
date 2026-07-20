@@ -101,6 +101,8 @@ export const SESSION_ADMIN: Session = {
   roles: { [DEFAULT_GUILD_ID]: "admin" },
   activeGuildId: DEFAULT_GUILD_ID,
   role: "admin",
+  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "settings:read", "settings:write"],
+  csrfToken: "mock-csrf-token-for-development-only",
   permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "activity:read", "settings:read", "settings:write"],
 };
 
@@ -128,6 +130,8 @@ export const SESSION_OWNER: Session = {
   roles: { [DEFAULT_GUILD_ID]: "owner" },
   activeGuildId: DEFAULT_GUILD_ID,
   role: "owner",
+  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "settings:read", "settings:write"],
+  csrfToken: "mock-csrf-token-for-development-only",
   permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "activity:read", "settings:read", "settings:write"],
 };
 

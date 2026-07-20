@@ -34,6 +34,44 @@ export async function GET(): Promise<NextResponse> {
   });
 }
 
+/**
+ * POST /api/guilds
+ * Requires guilds:write permission (create a guild).
+ *
+ * ⚠️  In production, resolve the session from the request (JWT / cookie)
+ *     instead of using MOCK_SESSION, then assertPermission against it.
+ */
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    assertCsrfToken(request);
+  } catch (err) {
+    if (err instanceof CsrfError) {
+      return apiError(err.message, 403);
+    }
+    throw err;
+  }
+
+  try {
+    assertPermission(MOCK_API_SESSION, "guilds:write");
+  } catch (err) {
+    if (err instanceof PermissionDeniedError) {
+      return apiError(err.message, 403);
+    }
+    throw err;
+  }
+
+  return handleApiError(async () => {
+    // TODO: implement guild request: Request): Promise<NextResponse> {
+  try {
+    assertCsrfToken(request);
+  } catch (err) {
+    if (err instanceof CsrfError) {
+      return apiError(err.message, 403);
+    }
+    throw err;
+  }
+
+    return { message: "Guild created (stub)" };
 export async function POST(request: Request): Promise<NextResponse> {
   const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "guilds:write");
   if (!guard.ok) return guard.response;
