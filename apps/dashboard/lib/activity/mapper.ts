@@ -19,14 +19,14 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         source: "webhook",
         severity: "info",
         actor: {
-          name: data.name,
+          name: data.name ?? "",
           wallet: data.wallet,
         },
         description: `New member joined: ${memberLabel}`,
         timestamp,
         entity: {
           type: "member",
-          id: data.id,
+          id: data.id ?? "",
           name: data.name,
         },
         metadata: data,
@@ -42,14 +42,14 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         source: "webhook",
         severity: "info",
         actor: {
-          name: data.name,
+          name: data.name ?? "",
           wallet: data.wallet,
         },
         description: `Member ${memberLabel} updated`,
         timestamp,
         entity: {
           type: "member",
-          id: data.id,
+          id: data.id ?? "",
           name: data.name,
         },
         metadata: data,
@@ -71,7 +71,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "pass",
-          id: data.id,
+          id: data.id ?? "",
           name: data.name,
         },
         metadata: data,
@@ -93,7 +93,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "pass",
-          id: data.id,
+          id: data.id ?? "",
           name: data.name,
         },
         metadata: data,
@@ -115,7 +115,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "guild",
-          id: data.id,
+          id: data.id ?? "",
           name: data.name,
         },
         metadata: data,
@@ -135,7 +135,7 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "verification",
-          id: data.wallet,
+          id: data.wallet ?? "",
         },
         metadata: data,
       };

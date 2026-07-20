@@ -3,6 +3,7 @@ import { handleApiError, apiError } from "@/lib/api-helpers";
 import { mockMembers, type Member } from "@/lib/mock-data";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { assertCsrfToken, CsrfError } from "@/lib/auth/csrf";
 import { IntegrationClient } from "@guildpass/integration-client";
 import { getEnv, getApiMode } from "@/lib/env";
 import { getMemberRepository } from "@/lib/repositories/factory";
@@ -91,7 +92,16 @@ export async function GET(request: Request): Promise<NextResponse> {
  * ⚠️  In production, resolve the session from the request (JWT / cookie)
  *     instead of using MOCK_SESSION, then assertPermission against it.
  */
-export async function POST(): Promise<NextResponse> {
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    assertCsrfToken(request);
+  } catch (err) {
+    if (err instanceof CsrfError) {
+      return apiError(err.message, 403);
+    }
+    throw err;
+  }
+
   try {
     assertPermission(MOCK_API_SESSION, "members:write");
   } catch (err) {
@@ -111,7 +121,16 @@ export async function POST(): Promise<NextResponse> {
  * DELETE /api/members
  * Requires members:write permission (remove a member).
  */
-export async function DELETE(): Promise<NextResponse> {
+export async function DELETE(request: Request): Promise<NextResponse> {
+  try {
+    assertCsrfToken(request);
+  } catch (err) {
+    if (err instanceof CsrfError) {
+      return apiError(err.message, 403);
+    }
+    throw err;
+  }
+
   try {
     assertPermission(MOCK_API_SESSION, "members:write");
   } catch (err) {

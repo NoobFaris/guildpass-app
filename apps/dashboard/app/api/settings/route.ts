@@ -2,18 +2,28 @@ import { NextResponse } from "next/server";
 import { handleApiError, apiError } from "@/lib/api-helpers";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { assertCsrfToken, CsrfError } from "@/lib/auth/csrf";
 
 /**
  * GET /api/settings is intentionally omitted — settings are rendered server-side
  * from the session; no separate read endpoint is needed for this page.
  *
  * PATCH /api/settings
- * Requires settings:write permission.
+ * Requires settings:write permission AND a valid CSRF token.
  *
  * ⚠️  In production, resolve the session from the request (JWT / cookie)
  *     instead of using MOCK_API_SESSION, then assertPermission against it.
  */
-export async function PATCH(): Promise<NextResponse> {
+export async function PATCH(request: Request): Promise<NextResponse> {
+  try {
+    assertCsrfToken(request);
+  } catch (err) {
+    if (err instanceof CsrfError) {
+      return apiError(err.message, 403);
+    }
+    throw err;
+  }
+
   try {
     assertPermission(MOCK_API_SESSION, "settings:write");
   } catch (err) {

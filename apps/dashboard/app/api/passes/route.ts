@@ -3,6 +3,7 @@ import { handleApiError, apiError } from "@/lib/api-helpers";
 import { mockPasses, type Pass } from "@/lib/mock-data";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
 import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
+import { assertCsrfToken, CsrfError } from "@/lib/auth/csrf";
 import { getApiMode } from "@/lib/env";
 import { getPassRepository } from "@/lib/repositories/factory";
 
@@ -38,7 +39,16 @@ export async function GET(): Promise<NextResponse> {
  * ⚠️  In production, resolve the session from the request (JWT / cookie)
  *     instead of using MOCK_SESSION, then assertPermission against it.
  */
-export async function POST(): Promise<NextResponse> {
+export async function POST(request: Request): Promise<NextResponse> {
+  try {
+    assertCsrfToken(request);
+  } catch (err) {
+    if (err instanceof CsrfError) {
+      return apiError(err.message, 403);
+    }
+    throw err;
+  }
+
   try {
     assertPermission(MOCK_API_SESSION, "passes:write");
   } catch (err) {
@@ -49,50 +59,16 @@ export async function POST(): Promise<NextResponse> {
   }
 
   return handleApiError(async () => {
-    // TODO: implement pass creation logic
-    return { message: "Pass created (stub)" };
-  });
-}
-
-/**
- * DELETE /api/passes
- * Requires passes:write permission.
- */
-export async function DELETE(): Promise<NextResponse> {
+    // TODO: implement pass crequest: Request): Promise<NextResponse> {
   try {
-    assertPermission(MOCK_API_SESSION, "passes:write");
+    assertCsrfToken(request);
   } catch (err) {
-    if (err instanceof PermissionDeniedError) {
+    if (err instanceof CsrfError) {
       return apiError(err.message, 403);
     }
     throw err;
   }
 
-  return handleApiError(async () => {
-    // TODO: implement pass deletion logic
-    return { message: "Pass deleted (stub)" };
-  });
-}
-
-/**
- * POST /api/passes
- * Requires passes:write permission.
- *
- * ⚠️  In production, resolve the session from the request (JWT / cookie)
- *     instead of using MOCK_SESSION, then assertPermission against it.
- */
-export async function POST(): Promise<NextResponse> {
-  try {
-    assertPermission(MOCK_API_SESSION, "passes:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    throw err;
-  }
-
-  return handleApiError(async () => {
-    // TODO: implement pass creation logic
     return { message: "Pass created (stub)" };
   });
 }

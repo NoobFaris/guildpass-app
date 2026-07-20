@@ -8,14 +8,14 @@ import {
   canEditSettings,
   assertPermission,
   PermissionDeniedError,
-} from "../lib/permissions.ts";
+} from "../lib/permissions";
 import {
   SESSION_ADMIN,
   SESSION_MODERATOR,
   SESSION_READONLY,
   SESSION_OWNER,
-} from "./fixtures.ts";
-import type { Session, Permission } from "../lib/auth/session.ts";
+} from "./fixtures";
+import type { Session, Permission } from "../lib/auth/session";
 
 /**
  * permissions.test.ts

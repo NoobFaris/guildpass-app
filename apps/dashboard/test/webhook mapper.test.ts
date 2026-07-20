@@ -1,8 +1,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { WEBHOOK_FIXTURES, FIXED_UNIX, makeWebhookPayload } from "./fixtures.ts";
-import type { ActivityEvent } from "../lib/activity/types.ts";
-import type { WebhookPayload } from "../lib/activity/types.ts";
+import { WEBHOOK_FIXTURES, FIXED_UNIX, makeWebhookPayload } from "./fixtures";
+import type { ActivityEvent } from "../lib/activity/types";
+import type { WebhookPayload } from "../lib/activity/types";
 
 /**
  * webhook-mapper.test.ts
@@ -31,10 +31,10 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         type: "member.joined",
         source: "webhook",
         severity: "info",
-        actor: { name: data.name, wallet: data.wallet },
+        actor: { name: data.name ?? "", wallet: data.wallet },
         description: `New member joined: ${data.name || data.wallet}`,
         timestamp,
-        entity: { type: "member", id: data.id, name: data.name },
+        entity: { type: "member", id: data.id ?? "", name: data.name },
         metadata: data,
       };
     case "membership.updated":
@@ -43,10 +43,10 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         type: "member.left",
         source: "webhook",
         severity: "info",
-        actor: { name: data.name, wallet: data.wallet },
+        actor: { name: data.name ?? "", wallet: data.wallet },
         description: `Member ${data.name || data.wallet} updated`,
         timestamp,
-        entity: { type: "member", id: data.id, name: data.name },
+        entity: { type: "member", id: data.id ?? "", name: data.name },
         metadata: data,
       };
     case "pass.created":
@@ -58,7 +58,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         actor: { name: "Admin" },
         description: `New pass created: ${data.name}`,
         timestamp,
-        entity: { type: "pass", id: data.id, name: data.name },
+        entity: { type: "pass", id: data.id ?? "", name: data.name },
         metadata: data,
       };
     case "pass.updated":
@@ -70,7 +70,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         actor: { name: "Admin" },
         description: `Pass updated: ${data.name}`,
         timestamp,
-        entity: { type: "pass", id: data.id, name: data.name },
+        entity: { type: "pass", id: data.id ?? "", name: data.name },
         metadata: data,
       };
     case "guild.updated":
@@ -82,7 +82,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         actor: { name: "Admin" },
         description: `Guild settings updated: ${data.name}`,
         timestamp,
-        entity: { type: "guild", id: data.id, name: data.name },
+        entity: { type: "guild", id: data.id ?? "", name: data.name },
         metadata: data,
       };
     case "verification.completed":
@@ -94,7 +94,7 @@ function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
         actor: { wallet: data.wallet },
         description: `Verification completed for ${data.wallet}`,
         timestamp,
-        entity: { type: "verification", id: data.wallet },
+        entity: { type: "verification", id: data.wallet ?? "" },
         metadata: data,
       };
     default:
@@ -137,13 +137,13 @@ describe("mapWebhookToActivity", () => {
     });
 
     test("sets actor name and wallet from payload data", () => {
-      assert.equal(result.actor.name, payload.data.name);
-      assert.equal(result.actor.wallet, payload.data.wallet);
+      assert.equal(result.actor.name, payload.data.name!);
+      assert.equal(result.actor.wallet, payload.data.wallet!);
     });
 
     test("description includes member name when present", () => {
       assert.ok(
-        result.description.includes(payload.data.name),
+        result.description.includes(payload.data.name!),
         `description "${result.description}" should include member name`
       );
     });
@@ -163,7 +163,7 @@ describe("mapWebhookToActivity", () => {
 
     test("entity type is 'member'", () => {
       assert.equal(result.entity?.type, "member");
-      assert.equal(result.entity?.id, payload.data.id);
+      assert.equal(result.entity?.id, payload.data.id!);
     });
 
     test("metadata equals raw payload data", () => {
@@ -185,7 +185,7 @@ describe("mapWebhookToActivity", () => {
     });
 
     test("description includes member name when present", () => {
-      assert.ok(result.description.includes(payload.data.name));
+      assert.ok(result.description.includes(payload.data.name!));
     });
 
     test("falls back to wallet in description when name is absent", () => {
@@ -217,12 +217,12 @@ describe("mapWebhookToActivity", () => {
     });
 
     test("description includes pass name", () => {
-      assert.ok(result.description.includes(payload.data.name));
+      assert.ok(result.description.includes(payload.data.name!));
     });
 
     test("entity type is 'pass'", () => {
       assert.equal(result.entity?.type, "pass");
-      assert.equal(result.entity?.name, payload.data.name);
+      assert.equal(result.entity?.name, payload.data.name!);
     });
   });
 
@@ -244,7 +244,7 @@ describe("mapWebhookToActivity", () => {
     });
 
     test("description includes pass name", () => {
-      assert.ok(result.description.includes(payload.data.name));
+      assert.ok(result.description.includes(payload.data.name!));
     });
   });
 
@@ -266,7 +266,7 @@ describe("mapWebhookToActivity", () => {
     });
 
     test("description includes guild name", () => {
-      assert.ok(result.description.includes(payload.data.name));
+      assert.ok(result.description.includes(payload.data.name!));
     });
 
     test("entity type is 'guild'", () => {
@@ -288,16 +288,16 @@ describe("mapWebhookToActivity", () => {
     });
 
     test("actor.wallet is set from payload data.wallet", () => {
-      assert.equal(result.actor.wallet, payload.data.wallet);
+      assert.equal(result.actor.wallet, payload.data.wallet!);
     });
 
     test("description includes wallet address", () => {
-      assert.ok(result.description.includes(payload.data.wallet));
+      assert.ok(result.description.includes(payload.data.wallet!));
     });
 
     test("entity type is 'verification' and id equals wallet", () => {
       assert.equal(result.entity?.type, "verification");
-      assert.equal(result.entity?.id, payload.data.wallet);
+      assert.equal(result.entity?.id, payload.data.wallet!);
     });
   });
 

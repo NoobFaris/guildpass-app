@@ -123,7 +123,7 @@ test("Repository Factory: MockActivityRepository", async () => {
   const event1 = {
     id: "evt_001",
     type: "member.joined" as const,
-    source: "dashboard",
+    source: "dashboard" as const,
     severity: "info" as const,
     actor: { name: "system" },
     timestamp: new Date().toISOString(),

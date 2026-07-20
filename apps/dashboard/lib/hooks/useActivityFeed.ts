@@ -33,7 +33,6 @@ function isActivityEvent(activity: Activity | ActivityEvent): activity is Activi
 function toActivityEvent(activity: Activity | ActivityEvent): ActivityEvent {
   if (isActivityEvent(activity)) return activity;
 
-function toActivityEvent(activity: Activity): ActivityEvent {
   return {
     id: activity.id,
     type: TYPE_MAP[activity.type],
