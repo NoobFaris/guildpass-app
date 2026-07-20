@@ -35,6 +35,29 @@ export interface MemberListQuery extends PaginationOptions {
 }
 
 /**
+<<<<<<< HEAD
+=======
+ * Create input for a pass. `guildId` is intentionally excluded: the owning
+ * guild comes only from the explicit `guildId` scope parameter, so a payload
+ * can never assign a record to a different tenant.
+ */
+export type PassCreateData = Omit<Pass, "id" | "createdAt" | "guildId">;
+
+/**
+ * Update input for a pass. `id` and `guildId` are excluded so a patch can
+ * never re-identify a record or move it to another tenant.
+ */
+export type PassUpdateData = Partial<Omit<Pass, "id" | "guildId">>;
+
+/** Create input for a member. See {@link PassCreateData} for the rationale.
+ * `version` is excluded — the server always initializes it to 1. */
+export type MemberCreateData = Omit<Member, "id" | "guildId" | "version">;
+
+/** Update input for a member. See {@link PassUpdateData} for the rationale. */
+export type MemberUpdateData = Partial<Omit<Member, "id" | "guildId">>;
+
+/**
+>>>>>>> main
  * Repository for managing passes.
  */
 export interface IPassRepository {
@@ -129,14 +152,39 @@ export interface IMemberRepository {
   create(member: Omit<Member, "id">): Promise<Member>;
 
   /**
+<<<<<<< HEAD
    * Update a member.
    */
   update(id: string, member: Partial<Member>): Promise<Member | null>;
+=======
+   * Update a member. Returns null when the member does not exist
+   * or belongs to a different guild. The owning guild can never change.
+   *
+   * When `expectedVersion` is provided the update is only applied when the
+   * stored version matches — a mismatch results in a thrown ConflictError
+   * rather than a silent overwrite.
+   */
+  update(guildId: string, id: string, member: MemberUpdateData, expectedVersion?: number): Promise<Member | null>;
+>>>>>>> main
 
   /**
    * Delete a member.
    */
+<<<<<<< HEAD
   delete(id: string): Promise<boolean>;
+=======
+  delete(guildId: string, id: string): Promise<boolean>;
+
+  /**
+   * Stream all members for a guild in bounded-size chunks.
+   *
+   * The async iterator yields pages internally (cursor-based when backed by
+   * a database); callers simply iterate without managing cursors. Never
+   * materializes the full result set — each page is fetched on demand so
+   * memory usage stays proportional to `chunkSize`, not the total count.
+   */
+  streamAll(guildId: string, chunkSize?: number): AsyncIterable<Member[]>;
+>>>>>>> main
 }
 
 /**

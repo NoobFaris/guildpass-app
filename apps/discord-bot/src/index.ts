@@ -27,6 +27,7 @@ dotenv.config();
 
 import { config, validateConfig } from "./config.js";
 import { createClient } from "./bot.js";
+import type { GuildStats } from "./bot.js";
 import type { Membership, VerificationResult } from "@guildpass/integration-client";
 
 // ── Mock mode detection ────────────────────────────────────────────────────
@@ -86,6 +87,20 @@ if (isMockMode) {
         status: "active",
         roles: ["member"],
         updatedAt: new Date().toISOString(),
+      };
+    }
+
+    async getGuildStats(_guildId: string): Promise<GuildStats> {
+      console.log("[mock] getGuildStats called", _guildId);
+      return {
+        totalMembers: 42,
+        activeCount: 31,
+        inactiveCount: 11,
+        roleDistribution: {
+          admin: 3,
+          member: 30,
+          contributor: 9,
+        },
       };
     }
   }

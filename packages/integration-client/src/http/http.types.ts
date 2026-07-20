@@ -1,3 +1,4 @@
+import type { CircuitBreakerConfig } from "./circuitBreaker.js";
 /**
 * Retry configuration for a single HTTP request (or the default for all
 * requests on a client when set via {@link TransportConfig.retry}).
@@ -58,4 +59,5 @@ fetch?: typeof fetch;
 timeout?: number;
 /** Default retry strategy for all requests. Default: 3 attempts with backoff. */
 retry?: RetryConfig;
+  circuitBreaker?: CircuitBreakerConfig;
 }

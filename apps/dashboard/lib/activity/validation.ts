@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { WebhookPayload } from "./types";
 import { SUPPORTED_WEBHOOK_EVENTS } from "./types";
+import { isValidChecksumAddress, normaliseAddress } from "../address";
 
 export type ValidationResult =
   | { valid: true; payload: WebhookPayload }
@@ -83,6 +84,17 @@ export function validateWebhookPayload(rawBody: string): ValidationResult {
         error: `${field}: ${issue.message}`,
         field,
       };
+    }
+    // Additional semantic validation: ensure wallets are checksummed and normalise them
+    const parsedData = dataResult.data as Record<string, unknown>;
+    const walletField = (parsedData.wallet as string) | undefined;
+    if (walletField) {
+      if (!isValidChecksumAddress(walletField)) {
+        return { valid: false, error: `data.wallet: wallet must be a checksummed Ethereum address`, field: "data.wallet" };
+      }
+      // replace with normalised checksummed form
+      parsedData.wallet = normaliseAddress(walletField);
+      payload.data = parsedData as any;
     }
   }
 

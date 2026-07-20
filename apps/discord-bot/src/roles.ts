@@ -8,9 +8,193 @@ import {
 
 export type RoleMap = Record<string, string>;
 
-// ── Singleton queue ──────────────────────────────────────────────────────
+// ── Per-member reconciliation lock ────────────────────────────────────────
+//
+// Serializes role reconciliation calls per Discord member (user ID) with
+// request coalescing. When multiple reconciliation requests arrive for the
+// same member before the first completes, only the latest desired-roles
+// set is applied — avoiding redundant, potentially flip-flopping API calls.
+//
+// Conflict resolution policy: LAST WRITE WINS
+// - The final role state deterministically matches the most recently
+//   requested desired-roles set for that member.
+// - This is the expected behavior: the latest membership state should win.
+
+export interface PendingReconciliation {
+  member: GuildMember;
+  desiredRoleIds: string[];
+  resolve: (result: ReconciliationResult) => void;
+  reject: (error: unknown) => void;
+}
+
+export interface ReconciliationResult {
+  added: string[];
+  removed: string[];
+}
+
+/**
+ * Per-member mutex with request coalescing for role reconciliation.
+ *
+ * Key properties:
+ * - At most one reconciliation runs at a time for a given member (userId)
+ * - Multiple concurrent requests coalesce to the latest desired state
+ * - Reconciliation for different members remains fully concurrent
+ * - "Last write wins" conflict resolution is deterministic
+ *
+ * Conflict resolution semantics:
+ * - The first request for a member starts immediately
+ * - Subsequent requests while the first is running are queued and coalesced
+ * - When the first completes, the coalesced pending request runs with the
+ *   LATEST desired state (intermediate states are skipped)
+ */
+export class MemberReconciliationLock {
+  /** Members currently being reconciled (in-flight). */
+  private readonly activeLocks = new Set<string>();
+
+  /** Pending reconciliation per member — only the latest is kept (coalescing). */
+  private readonly pending = new Map<string, PendingReconciliation>();
+
+  /** Waiters for the CURRENTLY RUNNING reconciliation. */
+  private readonly activeWaiters = new Map<string, Array<{
+    resolve: (result: ReconciliationResult) => void;
+    reject: (error: unknown) => void;
+  }>>();
+
+  /** Waiters for PENDING (not yet started) reconciliation. */
+  private readonly pendingWaiters = new Map<string, Array<{
+    resolve: (result: ReconciliationResult) => void;
+    reject: (error: unknown) => void;
+  }>>();
+
+  /**
+   * Acquire the lock for a member, coalescing with any pending request.
+   *
+   * If a reconciliation is already in-flight for this member, this request
+   * is queued and will coalesce with other pending requests. Only the most
+   * recent desired-roles set will be applied when the current one completes.
+   */
+  async acquire(
+    member: GuildMember,
+    desiredRoleIds: string[],
+  ): Promise<ReconciliationResult> {
+    const userId = member.user.id;
+
+    return new Promise<ReconciliationResult>((resolve, reject) => {
+      const waiter = { resolve, reject };
+
+      if (this.activeLocks.has(userId)) {
+        // A reconciliation is already running — queue for the PENDING batch.
+        // Update the pending request to the latest desired state (coalescing).
+        this.pending.set(userId, { member, desiredRoleIds, resolve, reject });
+
+        // Add to pending waiters
+        if (!this.pendingWaiters.has(userId)) {
+          this.pendingWaiters.set(userId, []);
+        }
+        this.pendingWaiters.get(userId)!.push(waiter);
+      } else {
+        // No reconciliation running — this request starts immediately.
+        this.pending.set(userId, { member, desiredRoleIds, resolve, reject });
+
+        if (!this.activeWaiters.has(userId)) {
+          this.activeWaiters.set(userId, []);
+        }
+        this.activeWaiters.get(userId)!.push(waiter);
+
+        this.processNext(userId);
+      }
+    });
+  }
+
+  /**
+   * Process the next pending reconciliation for a member.
+   */
+  private processNext(userId: string): void {
+    const pendingReq = this.pending.get(userId);
+    if (!pendingReq) {
+      // No more pending work for this member.
+      return;
+    }
+
+    // Mark as in-flight.
+    this.activeLocks.add(userId);
+    this.pending.delete(userId);
+
+    // Move pending waiters to active (they'll be notified when this completes)
+    const pendingW = this.pendingWaiters.get(userId);
+    if (pendingW && pendingW.length > 0) {
+      if (!this.activeWaiters.has(userId)) {
+        this.activeWaiters.set(userId, []);
+      }
+      this.activeWaiters.get(userId)!.push(...pendingW);
+      this.pendingWaiters.delete(userId);
+    }
+
+    // Run the reconciliation.
+    reconcileMemberRoles(pendingReq.member, pendingReq.desiredRoleIds)
+      .then((result) => {
+        this.onComplete(userId, result, null);
+      })
+      .catch((err) => {
+        this.onComplete(userId, null, err);
+      });
+  }
+
+  /**
+   * Handle reconciliation completion: notify active waiters, then process
+   * any newly pending request (which may have arrived during execution).
+   */
+  private onComplete(
+    userId: string,
+    result: ReconciliationResult | null,
+    error: unknown,
+  ): void {
+    // Release the lock.
+    this.activeLocks.delete(userId);
+
+    // Notify active waiters.
+    const waiters = this.activeWaiters.get(userId) ?? [];
+    this.activeWaiters.delete(userId);
+
+    for (const waiter of waiters) {
+      if (error) {
+        waiter.reject(error);
+      } else {
+        waiter.resolve(result!);
+      }
+    }
+
+    // If new requests arrived while we were reconciling, process the next.
+    if (this.pending.has(userId)) {
+      this.processNext(userId);
+    }
+  }
+
+  /** Expose current state for observability and testing. */
+  get state() {
+    return {
+      activeLocks: this.activeLocks.size,
+      pending: this.pending.size,
+      waiters: Array.from(this.activeWaiters.entries()).map(([k, v]) => ({
+        userId: k,
+        count: v.length,
+      })),
+    };
+  }
+
+  /** Clear all state (for testing). */
+  reset(): void {
+    this.activeLocks.clear();
+    this.pending.clear();
+    this.activeWaiters.clear();
+    this.pendingWaiters.clear();
+  }
+}
+
+// ── Singleton queue and lock ──────────────────────────────────────────────
 
 let _queue: RoleReconciliationQueue | null = null;
+let _memberLock: MemberReconciliationLock | null = null;
 
 /** Get or create the shared role-reconciliation queue. */
 export function getReconciliationQueue(
@@ -22,9 +206,31 @@ export function getReconciliationQueue(
   return _queue;
 }
 
-/** Replace the singleton (mainly for testing). */
+/** Replace the singleton queue (mainly for testing). */
 export function setReconciliationQueue(q: RoleReconciliationQueue): void {
   _queue = q;
+}
+
+/** Get or create the shared per-member reconciliation lock. */
+export function getMemberLock(): MemberReconciliationLock {
+  if (!_memberLock) {
+    _memberLock = new MemberReconciliationLock();
+  }
+  return _memberLock;
+}
+
+/** Replace the singleton lock (mainly for testing). */
+export function setMemberLock(lock: MemberReconciliationLock): void {
+  _memberLock = lock;
+}
+
+/** Reset both singletons (for testing). */
+export function resetReconciliationState(): void {
+  _queue = null;
+  if (_memberLock) {
+    _memberLock.reset();
+  }
+  _memberLock = null;
 }
 
 // ── Role resolution ──────────────────────────────────────────────────────
@@ -172,7 +378,18 @@ export async function reconcileMemberRoles(
  * Queue-aware wrapper: enqueues the reconciliation via the shared queue
  * so that per-guild concurrency is bounded and rate-limit-aware.
  *
- * @param guildId - The Discord guild (server) ID for queuing isolation.
+ * **Concurrency guarantees:**
+ * 1. Per-member serialization: Only one reconciliation runs at a time for a
+ *    given member (Discord user ID). Concurrent triggers never interleave
+ *    their read-modify-write cycles.
+ * 2. Request coalescing: Multiple concurrent requests for the same member
+ *    coalesce to the latest desired-roles set ("last write wins").
+ * 3. Per-guild rate limiting: Operations for the same guild are serialized
+ *    to respect Discord's rate limits.
+ * 4. Cross-member concurrency: Reconciliation for different members remains
+ *    fully concurrent (up to the guild queue's maxConcurrency limit).
+ *
+ * @param guildId - The Discord guild (server) ID for rate-limit isolation.
  * @param member - The GuildMember to reconcile.
  * @param desiredRoleIds - The target role set.
  */
@@ -183,7 +400,17 @@ export async function reconcileMemberRolesQueued(
   queueOptions?: QueueOptions,
 ): Promise<{ added: string[]; removed: string[] }> {
   const queue = getReconciliationQueue(queueOptions);
+  const memberLock = getMemberLock();
+
+  // The per-member lock ensures:
+  // 1. At most one reconciliation runs at a time per member
+  // 2. Concurrent requests coalesce to the latest desired state
+  // 3. "Last write wins" conflict resolution
+  //
+  // The guild queue ensures:
+  // 1. Per-guild rate limiting
+  // 2. Bounded global concurrency
   return queue.enqueue(guildId, () =>
-    reconcileMemberRoles(member, desiredRoleIds),
+    memberLock.acquire(member, desiredRoleIds),
   );
 }
