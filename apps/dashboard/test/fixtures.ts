@@ -6,6 +6,7 @@
  */
 
 import type { ActivityEvent } from "../lib/activity/types";
+import { CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 import type { Session } from "../lib/auth/session";
 import type { WebhookPayload } from "../lib/activity/types";
 
@@ -21,6 +22,7 @@ export function makeActivityEvent(overrides: Partial<ActivityEvent> = {}): Activ
     actor: { name: "Alice", wallet: "0xabc" },
     timestamp: FIXED_TIMESTAMP,
     description: "Alice joined the guild",
+    schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
     ...overrides,
   };
 }
@@ -98,22 +100,21 @@ export const SESSION_ADMIN: Session = {
   role: "admin",
   permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "settings:read", "settings:write"],
   csrfToken: "mock-csrf-token-for-development-only",
+  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "activity:read", "settings:read", "settings:write"],
 };
 
 export const SESSION_MODERATOR: Session = {
   userId: "test-mod-001",
   name: "Test Moderator",
   role: "moderator",
-  permissions: ["passes:read", "members:read", "members:write", "guilds:read", "settings:read"],
-  csrfToken: "mock-csrf-token-for-development-only",
+  permissions: ["passes:read", "members:read", "members:write", "guilds:read", "activity:read", "settings:read"],
 };
 
 export const SESSION_READONLY: Session = {
   userId: "test-readonly-001",
   name: "Test Viewer",
   role: "readonly",
-  permissions: ["passes:read", "members:read", "guilds:read", "settings:read"],
-  csrfToken: "mock-csrf-token-for-development-only",
+  permissions: ["passes:read", "members:read", "guilds:read", "activity:read", "settings:read"],
 };
 
 export const SESSION_OWNER: Session = {
@@ -122,6 +123,7 @@ export const SESSION_OWNER: Session = {
   role: "owner",
   permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "settings:read", "settings:write"],
   csrfToken: "mock-csrf-token-for-development-only",
+  permissions: ["passes:read", "passes:write", "members:read", "members:write", "guilds:read", "guilds:write", "activity:read", "settings:read", "settings:write"],
 };
 
 export const MOCK_PASSES_METRICS = [

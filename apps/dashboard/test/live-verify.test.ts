@@ -2,9 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert";
 import http from "node:http";
 
-process.env.DASHBOARD_API_MODE = "live";
-
 test("POST /api/verify forwards to core API in live mode", async () => {
+  const previousMode = process.env.DASHBOARD_API_MODE;
+  const previousCoreUrl = process.env.GUILD_PASS_CORE_URL;
+  process.env.DASHBOARD_API_MODE = "live";
+
   // Note: this test requires a mock HTTP server; see live-verify-mockclient for injected version
   const server = http.createServer((req, res) => {
     if (!req.url) return res.end();
@@ -48,13 +50,29 @@ test("POST /api/verify forwards to core API in live mode", async () => {
       body: JSON.stringify(payload),
     });
 
-    const res = await POST(req);
-    const data = await res.json();
+    const res = await POST(req as any);
+    const body = await res.json();
 
+    assert.strictEqual(body.ok, true);
+    const data = body.data;
     assert.strictEqual(data.userId, payload.discordUserId);
     assert.strictEqual(data.wallet, payload.wallet);
     assert.strictEqual(data.verified, true);
   } finally {
-    server.close();
+    if (server.listening) {
+      server.close();
+    }
+
+    if (previousMode === undefined) {
+      delete process.env.DASHBOARD_API_MODE;
+    } else {
+      process.env.DASHBOARD_API_MODE = previousMode;
+    }
+
+    if (previousCoreUrl === undefined) {
+      delete process.env.GUILD_PASS_CORE_URL;
+    } else {
+      process.env.GUILD_PASS_CORE_URL = previousCoreUrl;
+    }
   }
 });

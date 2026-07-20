@@ -23,23 +23,25 @@ Closes # <!-- Issue number this PR resolves -->
 
 ## Test Evidence
 
-<!-- Paste bot logs, screenshots of Discord command responses, or docs site previews. -->
+<!-- Paste test output, screenshots of the dashboard UI, or logs showing the change works. -->
 
 ## Checklist
 
 - [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md)
 - [ ] This PR is linked to an open issue
-- [ ] `npm run typecheck` passes with no errors
-- [ ] `npm run lint` passes (or issues are pre-existing and documented)
+- [ ] `pnpm typecheck` passes with no errors
+- [ ] `pnpm lint` passes (or issues are pre-existing and documented)
+- [ ] `pnpm test` passes (all existing tests still pass)
+- [ ] The dashboard starts and renders correctly (if UI or API code changed)
 - [ ] The Discord bot still starts and responds to commands (if bot code changed)
-- [ ] Docs site renders correctly (if docs changed): `npm run dev:docs`
+- [ ] Docs site renders correctly (if docs changed): `pnpm dev:docs`
 - [ ] No secrets, tokens, or API keys are included in this PR
 - [ ] Environment variable changes are reflected in `.env.example`
 - [ ] I have updated documentation if new behaviour was introduced
 
 ## Screenshots / Recordings
 
-<!-- Add screenshots or screen recordings if relevant (e.g. new slash command output, docs page). -->
+<!-- Add screenshots or screen recordings if relevant (e.g. dashboard page, test output, API response). -->
 
 ## Additional Notes
 

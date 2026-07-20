@@ -1,7 +1,7 @@
-import { test, describe, beforeEach } from "node:test";
+import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { activityStorage, IActivityStorage } from "../lib/activity/storage";
-import { makeActivityEvent } from "./fixtures";
+import { activityStorage } from "../lib/activity/storage.ts";
+import { makeActivityEvent } from "./fixtures.ts";
 
 /**
  * activity-storage.test.ts

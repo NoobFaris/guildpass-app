@@ -1,3 +1,5 @@
+import type { TransportConfig } from "./http/http.types.js";
+
 export type RoleKey = "admin" | "member" | "contributor"; // IC: 98
 export type MembershipStatus = "active" | "inactive" | "unknown"; // IC: 99
 export type Membership = {
@@ -10,6 +12,7 @@ export type Membership = {
 export type IntegrationClientOptions = {
   baseUrl: string; // IC: 106
   apiKey?: string; // IC: 107
+  transport?: TransportConfig;
 }; // IC: 108
 export type VerificationResult = {
   userId: string; // IC: 109
@@ -34,8 +37,10 @@ export type ActivityEventType =
   | "member.roles_changed"
   | "access.granted"
   | "access.revoked"
+  | "settings.updated"
   | "verification.completed"
-  | "webhook.received";
+  | "webhook.received"
+  | "activity.permission_denied";
 
 export type ActivityEventSource = "dashboard" | "webhook" | "core_api";
 
@@ -46,6 +51,37 @@ export type ActivityEventEntity = {
   id: string;
   name?: string;
 };
+
+/**
+ * A single field-level change captured in an audit diff
+ * (before/after snapshot of one top-level field).
+ */
+export type ActivityChange = {
+  field: string;
+  before?: unknown;
+  after?: unknown;
+};
+
+/**
+ * Field names that must never appear in audit diffs. These are write-only
+ * secrets: capturing their before/after values in an activity event would
+ * leak them into the (readable) audit trail.
+ */
+export const SENSITIVE_AUDIT_FIELDS: ReadonlySet<string> = new Set([
+  "apiKey",
+  "clientSecret",
+  "password",
+  "privateKey",
+  "secret",
+  "token",
+  "webhookSecret",
+]);
+
+/**
+ * The current schema version for ActivityEvent.
+ * Bump this when adding/removing/renaming fields on ActivityEvent.
+ */
+export const CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION = 2;
 
 export type ActivityEvent = {
   id: string;
@@ -61,4 +97,11 @@ export type ActivityEvent = {
   description: string;
   entity?: ActivityEventEntity;
   metadata?: Record<string, any>;
+  /** Field-level audit diff for mutation events. */
+  changes?: ActivityChange[];
+  /**
+   * Explicit schema version for backward-compatible migration.
+   * Legacy events stored without this field are treated as version 1.
+   */
+  schemaVersion: number;
 };

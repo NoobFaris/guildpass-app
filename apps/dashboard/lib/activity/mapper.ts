@@ -1,8 +1,13 @@
 import type { ActivityEvent, WebhookPayload } from "./types";
+import { CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
 
 function displayValue(...values: Array<unknown>): string {
   const value = values.find((item) => typeof item === "string" && item.length > 0);
   return typeof value === "string" ? value : "Unknown";
+}
+
+function entityId(...values: Array<unknown>): string {
+  return displayValue(...values);
 }
 
 export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | null {
@@ -19,17 +24,18 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         source: "webhook",
         severity: "info",
         actor: {
-          name: data.name ?? "",
-          wallet: data.wallet,
+          name: typeof data.name === "string" ? data.name : undefined,
+          wallet: typeof data.wallet === "string" ? data.wallet : undefined,
         },
         description: `New member joined: ${memberLabel}`,
         timestamp,
         entity: {
           type: "member",
-          id: data.id ?? "",
-          name: data.name,
+          id: entityId(data.id, data.wallet, data.name),
+          name: typeof data.name === "string" ? data.name : undefined,
         },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     }
 
@@ -42,8 +48,8 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         source: "webhook",
         severity: "info",
         actor: {
-          name: data.name ?? "",
-          wallet: data.wallet,
+          name: typeof data.name === "string" ? data.name : undefined,
+          wallet: typeof data.wallet === "string" ? data.wallet : undefined,
         },
         description: `Member ${memberLabel} updated`,
         timestamp,
@@ -51,8 +57,11 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
           type: "member",
           id: data.id ?? "",
           name: data.name,
+          id: entityId(data.id, data.wallet, data.name),
+          name: typeof data.name === "string" ? data.name : undefined,
         },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     }
 
@@ -73,8 +82,11 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
           type: "pass",
           id: data.id ?? "",
           name: data.name,
+          id: entityId(data.id, data.name),
+          name: typeof data.name === "string" ? data.name : undefined,
         },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     }
 
@@ -95,8 +107,11 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
           type: "pass",
           id: data.id ?? "",
           name: data.name,
+          id: entityId(data.id, data.name),
+          name: typeof data.name === "string" ? data.name : undefined,
         },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     }
 
@@ -115,10 +130,11 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         timestamp,
         entity: {
           type: "guild",
-          id: data.id ?? "",
-          name: data.name,
+          id: entityId(data.id, data.name),
+          name: typeof data.name === "string" ? data.name : undefined,
         },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
     }
 
@@ -129,15 +145,16 @@ export function mapWebhookToActivity(payload: WebhookPayload): ActivityEvent | n
         source: "webhook",
         severity: "info",
         actor: {
-          wallet: data.wallet,
+          wallet: typeof data.wallet === "string" ? data.wallet : undefined,
         },
         description: `Verification completed for ${displayValue(data.wallet)}`,
         timestamp,
         entity: {
           type: "verification",
-          id: data.wallet ?? "",
+          id: entityId(data.wallet),
         },
         metadata: data,
+        schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
       };
 
     default:

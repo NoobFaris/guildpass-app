@@ -185,7 +185,7 @@ export class DiscordLiveAdapter implements IntegrationAdapter {
         };
       } else {
         const errorData = await response.json().catch(() => ({}));
-        let statusReason: IntegrationStatus = "unhealthy";
+        const statusReason: IntegrationStatus = "unhealthy";
         let message = `Discord API returned status ${response.status}: ${errorData.message ?? "Unauthorized"}.`;
 
         // If the token is invalid (401), it's unhealthy

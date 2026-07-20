@@ -1,65 +1,67 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { verifySignature } from "@guildpass/webhook-utils";
 import { getEnv } from "@/lib/env";
 import { mapWebhookToActivity } from "@/lib/activity/mapper";
 import { activityStorage } from "@/lib/activity/storage";
-import { ActivityEvent, WebhookPayload } from "@/lib/activity/types";
+import { publishActivityEvent } from "@/lib/activity/stream";
+import { apiError, apiResponse, apiValidationError } from "@/lib/api-helpers";
+import { validateWebhookPayload } from "@/lib/activity/validation";
 
 export async function POST(req: NextRequest) {
   try {
-    const { WEBHOOK_SECRET } = getEnv();
-    
+    const { WEBHOOK_SECRET, WEBHOOK_SECRET_PREVIOUS } = getEnv();
+
     if (!WEBHOOK_SECRET) {
       console.error("WEBHOOK_SECRET is not configured");
-      return NextResponse.json(
-        { error: "Webhook secret not configured" },
-        { status: 500 }
-      );
+      return apiError("Webhook secret not configured", 500);
     }
+
+    const secrets = [WEBHOOK_SECRET, WEBHOOK_SECRET_PREVIOUS].filter(
+      (secret): secret is string => Boolean(secret)
+    );
 
     const signatureHeader = req.headers.get("x-guildpass-signature");
     if (!signatureHeader) {
-      return NextResponse.json(
-        { error: "Missing signature header" },
-        { status: 401 }
-      );
+      return apiError("Missing signature header", 401);
     }
 
     const rawBody = await req.text();
-    
+
     const verification = verifySignature({
       signatureHeader,
-      secret: WEBHOOK_SECRET,
+      secret: secrets,
       payload: rawBody,
     });
 
     if (!verification.valid) {
-      return NextResponse.json(
-        { error: verification.error || "Invalid signature" },
-        { status: 401 }
-      );
+      return apiError(verification.error || "Invalid signature", 401);
     }
 
-    const payload = JSON.parse(rawBody) as WebhookPayload;
+    const validation = validateWebhookPayload(rawBody);
+    if (!validation.valid) {
+      return apiValidationError("Invalid webhook payload", [
+        { field: validation.field ?? "payload", message: validation.error },
+      ]);
+    }
+
+    const payload = validation.payload;
 
     // Map webhook event to dashboard activity
     const activity = mapWebhookToActivity(payload);
-    
+
     if (activity) {
       const result = await activityStorage.recordActivityEvent(activity);
       if (result === "duplicate") {
-        return NextResponse.json({ status: "ignored", reason: "duplicate" });
+        return apiResponse({ status: "ignored", reason: "duplicate" });
       }
 
-      return NextResponse.json({ status: "success", id: activity.id });
+      publishActivityEvent(activity);
+      return apiResponse({ status: "success", id: activity.id });
     }
 
-    return NextResponse.json({ status: "ignored", reason: "unsupported event type" });
+    return apiResponse({ status: "ignored", reason: "unsupported event type" });
   } catch (err) {
     console.error("Webhook processing failed:", err);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return apiError("Internal server error", 500);
   }
 }

@@ -1,7 +1,12 @@
-import { NextResponse } from "next/server";
-import { handleApiError, apiResponse } from "@/lib/api-helpers";
-import { getEnv, getApiMode } from "@/lib/env";
+import { NextRequest, NextResponse } from "next/server";
+import {
+apiResponse,
+apiValidationError,
+handleApiError,
+} from "@/lib/api-helpers";
+import { validateLiveModeEnv, getApiMode } from "@/lib/env";
 import { IntegrationClient, type VerificationResult } from "@guildpass/integration-client";
+import { isValidChecksumAddress, normaliseAddress } from "@/dashboard/lib/address";
 
 export async function POST(request: Request): Promise<NextResponse> {
   return handleApiError(async () => {
@@ -10,26 +15,39 @@ export async function POST(request: Request): Promise<NextResponse> {
     const { discordUserId, wallet } = body;
 
     if (!discordUserId || !wallet) {
-      return NextResponse.json(
-        { error: "Missing discordUserId or wallet" },
-        { status: 400 }
-      );
+      return apiValidationError("Missing verification fields", [
+        ...(!discordUserId
+          ? [{ field: "discordUserId", message: "discordUserId is required" }]
+          : []),
+        ...(!wallet ? [{ field: "wallet", message: "wallet is required" }] : []),
+      ]);
     }
 
+    if (!isValidChecksumAddress(wallet)) {
+      return apiValidationError("Invalid wallet", [
+        { field: "wallet", message: "wallet must be a checksummed Ethereum address" },
+      ]);
+    }
+    const normalizedWallet = normaliseAddress(wallet);
+
     if (mode === "live") {
-      const env = getEnv();
       // Allow injecting a test client via globalThis for unit tests
       const testClient = (globalThis as any).__TEST_INTEGRATION_CLIENT;
-      const client =
-        testClient ??
-        new IntegrationClient({
-          baseUrl: env.GUILD_PASS_CORE_URL as string,
-          apiKey: env.GUILD_PASS_CORE_API_KEY,
+      let client;
+
+      if (testClient) {
+        client = testClient;
+      } else {
+        const liveEnv = validateLiveModeEnv();
+        client = new IntegrationClient({
+          baseUrl: liveEnv.GUILD_PASS_CORE_URL,
+          apiKey: liveEnv.GUILD_PASS_CORE_API_KEY,
         });
+      }
 
       const result: VerificationResult = await client.verifyWallet(
         discordUserId,
-        wallet
+        normalizedWallet
       );
 
       return apiResponse(result);

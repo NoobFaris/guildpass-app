@@ -1,21 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { type ActivityEvent } from "@guildpass/integration-client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ActivityEvent, CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION } from "@guildpass/integration-client";
+import { connectActivityStream } from "@/lib/activity/client-stream";
+import { filterActivityEvents, type ActivityQuery } from "@/lib/activity/query";
+import { getActivityRefreshConfig } from "@/lib/env";
 import { type Activity, fetchActivity, generateMockActivity } from "@/lib/mock-data";
 
-const REFRESH_MS =
-  Number(process.env.NEXT_PUBLIC_ACTIVITY_REFRESH_MS) || 15_000;
-
-interface UseActivityFeedOptions {
-  /** How many events to surface at most (default: unlimited). */
+interface UseActivityFeedOptions extends Omit<ActivityQuery, "cursor"> {
+  /** How many events to request per REST page. */
   limit?: number;
+  /** Override the fallback interval. Pass 0 to disable automatic delivery. */
+  refreshIntervalMs?: number;
+  autoRefresh?: boolean;
+  simulate?: boolean;
+  /** Tenant scope — when set, activity is filtered to this guild. */
+  guildId?: string;
 }
 
 interface UseActivityFeedResult {
   events: ActivityEvent[];
   lastUpdated: Date | null;
   loading: boolean;
+  loadingMore: boolean;
+  refreshing: boolean;
+  hasMore: boolean;
+  total: number;
+  error: string | null;
+  loadMore: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const TYPE_MAP: Record<Activity["type"], ActivityEvent["type"]> = {
@@ -38,65 +51,252 @@ function toActivityEvent(activity: Activity | ActivityEvent): ActivityEvent {
     type: TYPE_MAP[activity.type],
     source: "dashboard",
     severity: "info",
-    actor: {
-      name: activity.actor,
-    },
+    actor: { name: activity.actor },
     timestamp: activity.timestamp,
     description: activity.description,
+    metadata: { guildId: activity.guildId },
+    schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
   };
 }
 
-export function useActivityFeed({ limit }: UseActivityFeedOptions = {}): UseActivityFeedResult {
-  const [events, setEvents]           = useState<ActivityEvent[]>([]);
+export function useActivityFeed({
+  limit,
+  type,
+  source,
+  severity,
+  entityType,
+  actor,
+  from,
+  refreshIntervalMs,
+  autoRefresh = true,
+  simulate = true,
+  guildId,
+}: UseActivityFeedOptions = {}): UseActivityFeedResult {
+  const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [loading, setLoading]         = useState(true);
-  const seenIds                       = useRef(new Set<string>());
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const seenIds = useRef(new Set<string>());
+  const queryVersion = useRef(0);
+  const requestVersion = useRef(0);
 
-  const mergeEvents = useCallback((incoming: ActivityEvent[]) => {
-    const fresh = incoming.filter((e) => !seenIds.current.has(e.id));
-    if (fresh.length === 0) return;
-    fresh.forEach((e) => seenIds.current.add(e.id));
-    setEvents((prev) => {
-      const merged = [...fresh, ...prev].sort(
-        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
-      return limit ? merged.slice(0, limit) : merged;
+  const config = getActivityRefreshConfig();
+  const fallbackIntervalMs = refreshIntervalMs ?? config.intervalMs;
+  const maxEvents = config.maxEvents;
+
+  const query = useMemo<ActivityQuery & { guildId?: string }>(
+    () => ({
+      limit,
+      type,
+      source,
+      severity,
+      entityType,
+      actor: actor?.trim() || undefined,
+      from,
+      guildId,
+    }),
+    [limit, type, source, severity, entityType, actor, from, guildId]
+  );
+
+  const hasFilters = Boolean(type || source || severity || entityType || actor?.trim() || from);
+
+  const replaceEvents = useCallback((incoming: ActivityEvent[]) => {
+    setEvents((previous) => {
+      const byId = new Map(previous.map((event) => [event.id, event]));
+      incoming.forEach((event) => byId.set(event.id, event));
+      const bounded = [...byId.values()].sort(compareActivityEvents).slice(0, maxEvents);
+      seenIds.current = new Set(bounded.map((event) => event.id));
+      return bounded;
     });
     setLastUpdated(new Date());
-  }, [limit]);
+  }, [maxEvents]);
 
-  /** Single poll tick: fetch real/mock data + inject one simulated event in mock mode. */
-  const poll = useCallback(async () => {
+  const appendEvents = useCallback((incoming: ActivityEvent[]) => {
+    const fresh = incoming.filter((event) => !seenIds.current.has(event.id));
+    if (fresh.length === 0) return;
+
+    fresh.forEach((event) => seenIds.current.add(event.id));
+    setEvents((previous) => {
+      const bounded = [...previous, ...fresh]
+        .sort(compareActivityEvents)
+        .slice(0, maxEvents);
+      seenIds.current = new Set(bounded.map((event) => event.id));
+      return bounded;
+    });
+    setLastUpdated(new Date());
+  }, [maxEvents]);
+
+  const prependLiveEvent = useCallback((event: ActivityEvent) => {
+    if (seenIds.current.has(event.id)) return;
+    if (filterActivityEvents([event], query).events.length === 0) return;
+
+    seenIds.current.add(event.id);
+    setEvents((previous) => {
+      const bounded = [event, ...previous]
+        .sort(compareActivityEvents)
+        .slice(0, maxEvents);
+      seenIds.current = new Set(bounded.map((activity) => activity.id));
+      return bounded;
+    });
+    setTotal((previous) => previous + 1);
+    setLastUpdated(new Date());
+    setError(null);
+  }, [maxEvents, query]);
+
+  const fetchLatest = useCallback(async ({ simulateEvent = true } = {}) => {
+    const version = queryVersion.current;
+    const currentRequest = requestVersion.current + 1;
+    requestVersion.current = currentRequest;
     try {
-      const data = await fetchActivity();
-      mergeEvents(data.map(toActivityEvent));
-      // Simulate a new arriving event every tick in mock/dev mode
-      const mock = generateMockActivity();
-      mergeEvents([toActivityEvent(mock)]);
+      const data = await fetchActivity(query);
+      if (
+        version !== queryVersion.current ||
+        currentRequest !== requestVersion.current
+      ) return;
+      const incoming = data.events.map(toActivityEvent);
+      replaceEvents(incoming);
+      setNextCursor(data.nextCursor);
+      setTotal(data.total);
+      setError(null);
+
+      if (simulateEvent && simulate && !hasFilters) {
+        prependLiveEvent(toActivityEvent(generateMockActivity(guildId)));
+      }
     } catch {
-      // Silently swallow fetch errors; the feed keeps its last known state
+      if (version === queryVersion.current) {
+        setError("Activity feed is temporarily unavailable.");
+      }
     } finally {
-      setLoading(false);
+      if (version === queryVersion.current) setLoading(false);
     }
-  }, [mergeEvents]);
+  }, [guildId, hasFilters, prependLiveEvent, query, replaceEvents, simulate]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchLatest();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchLatest]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+
+    const version = queryVersion.current;
+    setLoadingMore(true);
+    try {
+      const data = await fetchActivity({ ...query, cursor: nextCursor });
+      if (version !== queryVersion.current) return;
+      appendEvents(data.events.map(toActivityEvent));
+      setNextCursor(data.nextCursor);
+      setTotal((previous) => Math.max(previous, data.total));
+      setError(null);
+    } catch {
+      if (version === queryVersion.current) {
+        setError("More activity could not be loaded.");
+      }
+    } finally {
+      if (version === queryVersion.current) setLoadingMore(false);
+    }
+  }, [appendEvents, loadingMore, nextCursor, query]);
 
   useEffect(() => {
-    // Initial load
-    poll();
+    let disposed = false;
+    let pollingId: ReturnType<typeof setInterval> | null = null;
+    let reconciliationId: ReturnType<typeof setTimeout> | null = null;
+    let stopStream = () => {};
 
-    const tick = () => {
-      // Pause polling while the tab is hidden to avoid wasted requests
-      if (document.visibilityState === "visible") poll();
+    const pollWhenVisible = () => {
+      if (document.visibilityState === "visible") void fetchLatest();
     };
 
-    const id = setInterval(tick, REFRESH_MS);
-    document.addEventListener("visibilitychange", tick);
+    const stopPolling = () => {
+      if (pollingId === null) return;
+      clearInterval(pollingId);
+      pollingId = null;
+      document.removeEventListener("visibilitychange", pollWhenVisible);
+    };
+
+    const startPolling = () => {
+      if (disposed || pollingId !== null || fallbackIntervalMs <= 0) return;
+      pollingId = setInterval(pollWhenVisible, fallbackIntervalMs);
+      document.addEventListener("visibilitychange", pollWhenVisible);
+    };
+
+    const scheduleReconciliation = () => {
+      reconciliationId = scheduleActivityReconciliation(
+        reconciliationId,
+        () => {
+          reconciliationId = null;
+          if (!disposed) void fetchLatest({ simulateEvent: false });
+        }
+      );
+    };
+
+    queryVersion.current += 1;
+    seenIds.current.clear();
+    setEvents([]);
+    setNextCursor(null);
+    setTotal(0);
+    setLoading(true);
+    setLoadingMore(false);
+    void fetchLatest();
+
+    if (autoRefresh && fallbackIntervalMs > 0) {
+      if (typeof EventSource === "undefined") {
+        startPolling();
+      } else {
+        stopStream = connectActivityStream({
+          onEvent: (event) => {
+            prependLiveEvent(event);
+            scheduleReconciliation();
+          },
+          onFallback: startPolling,
+          onReady: () => {
+            void fetchLatest({ simulateEvent: false });
+          },
+        });
+      }
+    }
 
     return () => {
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", tick);
+      disposed = true;
+      if (reconciliationId !== null) clearTimeout(reconciliationId);
+      stopStream();
+      stopPolling();
     };
-  }, [poll]);
+  }, [autoRefresh, fallbackIntervalMs, fetchLatest, prependLiveEvent]);
 
-  return { events, lastUpdated, loading };
+  return {
+    events,
+    lastUpdated,
+    loading,
+    loadingMore,
+    refreshing,
+    hasMore: Boolean(nextCursor),
+    total,
+    error,
+    loadMore,
+    refresh,
+  };
+}
+
+export function scheduleActivityReconciliation(
+  existingTimer: ReturnType<typeof setTimeout> | null,
+  reconcile: () => void,
+  delayMs = 50
+): ReturnType<typeof setTimeout> {
+  if (existingTimer !== null) clearTimeout(existingTimer);
+  return setTimeout(reconcile, delayMs);
+}
+
+function compareActivityEvents(a: ActivityEvent, b: ActivityEvent): number {
+  const timeDiff = new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+  if (timeDiff !== 0) return timeDiff;
+  return b.id.localeCompare(a.id);
 }

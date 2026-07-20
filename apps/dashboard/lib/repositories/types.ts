@@ -5,35 +5,98 @@
 
 import type { Pass, Guild, Member } from "../mock-data";
 import type { ActivityEvent } from "@/lib/activity/types";
+import type { DashboardSettings } from "../settings";
+import type { PaginatedResponse } from "../api-contracts";
+
+/**
+ * Input type for appending an activity event.
+ * `schemaVersion` defaults to the current version when omitted.
+ */
+export type ActivityEventInput = Omit<ActivityEvent, "id" | "timestamp" | "schemaVersion"> &
+  Partial<Pick<ActivityEvent, "schemaVersion">>;
+
+export interface PaginationOptions {
+  limit?: number;
+  cursor?: string | null;
+  page?: number;
+}
+
+export type PaginatedResult<T> = PaginatedResponse<T>;
+
+export interface PassListQuery extends PaginationOptions {
+  search?: string;
+  status?: Pass["status"] | "all";
+}
+
+export interface MemberListQuery extends PaginationOptions {
+  search?: string;
+  status?: Member["status"] | "all";
+  role?: string | "all";
+}
+
+/**
+ * Create input for a pass. `guildId` is intentionally excluded: the owning
+ * guild comes only from the explicit `guildId` scope parameter, so a payload
+ * can never assign a record to a different tenant.
+ */
+export type PassCreateData = Omit<Pass, "id" | "createdAt" | "guildId">;
+
+/**
+ * Update input for a pass. `id` and `guildId` are excluded so a patch can
+ * never re-identify a record or move it to another tenant.
+ */
+export type PassUpdateData = Partial<Omit<Pass, "id" | "guildId">>;
+
+/** Create input for a member. See {@link PassCreateData} for the rationale.
+ * `version` is excluded — the server always initializes it to 1. */
+export type MemberCreateData = Omit<Member, "id" | "guildId" | "version">;
+
+/** Update input for a member. See {@link PassUpdateData} for the rationale. */
+export type MemberUpdateData = Partial<Omit<Member, "id" | "guildId">>;
 
 /**
  * Repository for managing passes.
+ *
+ * Multi-tenant isolation guarantee: every method requires an explicit
+ * `guildId` scope as its first parameter — omitting it is a compile error,
+ * not a runtime possibility. Implementations MUST guarantee that a call
+ * scoped to guild A can never read, modify, or delete guild B's data, even
+ * when given an ID that exists in another guild (such calls behave exactly
+ * as if the record does not exist). See docs/multi-tenancy.md.
  */
 export interface IPassRepository {
   /**
-   * Get all passes.
+   * Get all passes belonging to the given guild.
    */
-  getAll(): Promise<Pass[]>;
+  getAll(guildId: string): Promise<Pass[]>;
 
   /**
-   * Get a pass by ID.
+   * Query the guild's passes with filtering and bounded pagination.
    */
-  getById(id: string): Promise<Pass | null>;
+  query(guildId: string, options?: PassListQuery): Promise<PaginatedResult<Pass>>;
 
   /**
-   * Create a new pass.
+   * Get a pass by ID. Returns null when the pass does not exist
+   * or belongs to a different guild.
    */
-  create(pass: Omit<Pass, "id" | "createdAt">): Promise<Pass>;
+  getById(guildId: string, id: string): Promise<Pass | null>;
 
   /**
-   * Update an existing pass.
+   * Create a new pass owned by the given guild.
    */
-  update(id: string, pass: Partial<Pass>): Promise<Pass | null>;
+  create(guildId: string, pass: PassCreateData): Promise<Pass>;
 
   /**
-   * Delete a pass.
+   * Update an existing pass. Returns null when the pass does not exist
+   * or belongs to a different guild. The owning guild can never change.
    */
-  delete(id: string): Promise<boolean>;
+  update(guildId: string, id: string, pass: PassUpdateData): Promise<Pass | null>;
+
+  /**
+   * Delete a pass. Returns false when the pass does not exist
+   * or belongs to a different guild.
+   */
+  delete(guildId: string, id: string): Promise<boolean>;
 }
 
 /**
@@ -68,37 +131,68 @@ export interface IGuildRepository {
 
 /**
  * Repository for managing members.
+ *
+ * Multi-tenant isolation guarantee: every method requires an explicit
+ * `guildId` scope as its first parameter — omitting it is a compile error,
+ * not a runtime possibility. Implementations MUST guarantee that a call
+ * scoped to guild A can never read, modify, or delete guild B's data, even
+ * when given an ID or wallet that exists in another guild (such calls behave
+ * exactly as if the record does not exist). See docs/multi-tenancy.md.
  */
 export interface IMemberRepository {
   /**
-   * Get all members.
+   * Get all members belonging to the given guild.
    */
-  getAll(): Promise<Member[]>;
+  getAll(guildId: string): Promise<Member[]>;
 
   /**
-   * Get a member by ID.
+   * Query the guild's members with filtering and bounded pagination.
    */
-  getById(id: string): Promise<Member | null>;
+  query(guildId: string, options?: MemberListQuery): Promise<PaginatedResult<Member>>;
 
   /**
-   * Get a member by wallet address.
+   * Get a member by ID. Returns null when the member does not exist
+   * or belongs to a different guild.
    */
-  getByWallet(wallet: string): Promise<Member | null>;
+  getById(guildId: string, id: string): Promise<Member | null>;
 
   /**
-   * Create a new member.
+   * Get a member of the given guild by wallet address. Returns null when no
+   * member with that wallet exists in this guild, even if the same wallet is
+   * a member of another guild.
    */
-  create(member: Omit<Member, "id">): Promise<Member>;
+  getByWallet(guildId: string, wallet: string): Promise<Member | null>;
 
   /**
-   * Update a member.
+   * Create a new member owned by the given guild.
    */
-  update(id: string, member: Partial<Member>): Promise<Member | null>;
+  create(guildId: string, member: MemberCreateData): Promise<Member>;
 
   /**
-   * Delete a member.
+   * Update a member. Returns null when the member does not exist
+   * or belongs to a different guild. The owning guild can never change.
+   *
+   * When `expectedVersion` is provided the update is only applied when the
+   * stored version matches — a mismatch results in a thrown ConflictError
+   * rather than a silent overwrite.
    */
-  delete(id: string): Promise<boolean>;
+  update(guildId: string, id: string, member: MemberUpdateData, expectedVersion?: number): Promise<Member | null>;
+
+  /**
+   * Delete a member. Returns false when the member does not exist
+   * or belongs to a different guild.
+   */
+  delete(guildId: string, id: string): Promise<boolean>;
+
+  /**
+   * Stream all members for a guild in bounded-size chunks.
+   *
+   * The async iterator yields pages internally (cursor-based when backed by
+   * a database); callers simply iterate without managing cursors. Never
+   * materializes the full result set — each page is fetched on demand so
+   * memory usage stays proportional to `chunkSize`, not the total count.
+   */
+  streamAll(guildId: string, chunkSize?: number): AsyncIterable<Member[]>;
 }
 
 /**
@@ -107,9 +201,10 @@ export interface IMemberRepository {
  */
 export interface IActivityRepository {
   /**
-   * Append an activity event.
+   * Append an activity event. `schemaVersion` defaults to the current version
+   * when omitted.
    */
-  append(event: Omit<ActivityEvent, "id" | "timestamp">): Promise<ActivityEvent>;
+  append(event: ActivityEventInput): Promise<ActivityEvent>;
 
   /**
    * Query activity events with optional filtering.
@@ -132,6 +227,20 @@ export interface IActivityRepository {
 }
 
 /**
+ * Repository for workspace dashboard settings.
+ *
+ * Settings are a single workspace-level document (not a keyed collection), so
+ * the contract is a simple get / partial-update pair rather than CRUD.
+ */
+export interface ISettingsRepository {
+  /** Read the current dashboard settings. */
+  get(): Promise<DashboardSettings>;
+
+  /** Merge a partial update into the stored settings and return the result. */
+  update(patch: Partial<DashboardSettings>): Promise<DashboardSettings>;
+}
+
+/**
  * Factory for creating repository instances based on storage mode.
  */
 export interface IRepositoryFactory {
@@ -139,4 +248,5 @@ export interface IRepositoryFactory {
   guildRepository(): IGuildRepository;
   memberRepository(): IMemberRepository;
   activityRepository(): IActivityRepository;
+  settingsRepository(): ISettingsRepository;
 }

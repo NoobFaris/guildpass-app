@@ -2,6 +2,11 @@ import { mkdir, open, readFile, appendFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ActivityEvent } from "./types";
+import {
+  CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
+  upcastActivityEvents,
+} from "@guildpass/integration-client";
+import { ActivityQuery, ActivityQueryResult, filterActivityEvents } from "./query";
 import { type Activity, mockActivity } from "../mock-data";
 
 /**
@@ -18,6 +23,7 @@ export type ActivityWriteResult = "recorded" | "duplicate";
 export interface IActivityStorage {
   addEvent(event: ActivityEvent): Promise<void>;
   getEvents(limit?: number): Promise<ActivityEvent[]>;
+  queryEvents(query?: ActivityQuery): Promise<ActivityQueryResult>;
   isDuplicate(eventId: string): Promise<boolean>;
   hasProcessedEvent(eventId: string): Promise<boolean>;
   recordProcessedEvent(eventId: string): Promise<ActivityWriteResult>;
@@ -48,6 +54,7 @@ function convertMockActivityToEvent(activity: Activity): ActivityEvent {
     },
     timestamp: activity.timestamp,
     description: activity.description,
+    schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
   };
 }
 
@@ -89,7 +96,15 @@ class InMemoryActivityStorage implements IActivityStorage {
   }
 
   async getEvents(limit?: number): Promise<ActivityEvent[]> {
-    return limit ? this.events.slice(0, limit) : [...this.events];
+    if (limit) {
+      return this.queryEvents({ limit }).then((result) => result.events);
+    }
+
+    return [...this.events];
+  }
+
+  async queryEvents(query: ActivityQuery = {}): Promise<ActivityQueryResult> {
+    return filterActivityEvents(this.events, query);
   }
 
   async isDuplicate(eventId: string): Promise<boolean> {
@@ -151,20 +166,45 @@ export class FileActivityStorage implements IActivityStorage {
   }
 
   async getEvents(limit?: number): Promise<ActivityEvent[]> {
+    if (limit) {
+      return this.queryEvents({ limit }).then((result) => result.events);
+    }
+
+    await this.ensureStore();
+
+    try {
+      const file = await readFile(this.eventsPath, "utf8");
+      const raws = file
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line))
+        .reverse();
+      return upcastActivityEvents(raws);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  async queryEvents(query: ActivityQuery = {}): Promise<ActivityQueryResult> {
     await this.ensureStore();
 
     try {
       const raw = await readFile(this.eventsPath, "utf8");
-      const events = raw
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as ActivityEvent)
-        .reverse();
+      const events = upcastActivityEvents(
+        raw
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => JSON.parse(line))
+          .reverse()
+      );
 
-      return limit ? events.slice(0, limit) : events;
+      return filterActivityEvents(events, query);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return [];
+        return filterActivityEvents([], query);
       }
       throw error;
     }

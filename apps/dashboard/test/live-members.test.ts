@@ -2,9 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert";
 import http from "node:http";
 
-process.env.DASHBOARD_API_MODE = "live";
-
 test("GET /api/members performs live wallet lookup via core API", async () => {
+  const previousMode = process.env.DASHBOARD_API_MODE;
+  const previousCoreUrl = process.env.GUILD_PASS_CORE_URL;
+  process.env.DASHBOARD_API_MODE = "live";
+
   // Note: this test requires a mock HTTP server; see live-members-mockclient for injected version
   // Start a tiny HTTP server that mimics the core API
   const server = http.createServer((req, res) => {
@@ -54,12 +56,28 @@ test("GET /api/members performs live wallet lookup via core API", async () => {
 
     const req = new Request("http://localhost/api/members?wallet=0xabc123");
     const res: Response = await GET(req as any);
-    const data = await res.json();
+    const body = await res.json();
 
+    assert.strictEqual(body.ok, true);
+    const data = body.data;
     assert.ok(Array.isArray(data));
     assert.strictEqual(data.length, 1);
     assert.strictEqual(data[0].wallet, "0xabc123");
   } finally {
-    server.close();
+    if (server.listening) {
+      server.close();
+    }
+
+    if (previousMode === undefined) {
+      delete process.env.DASHBOARD_API_MODE;
+    } else {
+      process.env.DASHBOARD_API_MODE = previousMode;
+    }
+
+    if (previousCoreUrl === undefined) {
+      delete process.env.GUILD_PASS_CORE_URL;
+    } else {
+      process.env.GUILD_PASS_CORE_URL = previousCoreUrl;
+    }
   }
 });

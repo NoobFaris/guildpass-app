@@ -1,40 +1,46 @@
 import { NextResponse } from "next/server";
-import { handleApiError, apiError } from "@/lib/api-helpers";
+import { apiValidationError, handleApiError } from "@/lib/api-helpers";
 import { MOCK_API_SESSION } from "@/lib/auth/session";
-import { assertPermission, PermissionDeniedError } from "@/lib/permissions";
-import { assertCsrfToken, CsrfError } from "@/lib/auth/csrf";
+import { guardPermission, requireSessionAndPermission } from "@/lib/auth/require-permission";
+import { getSettingsRepository } from "@/lib/repositories/factory";
+import { validateSettingsPatch } from "@/lib/validation/settings";
+import { recordDashboardActivity } from "@/lib/activity/dashboard";
 
-/**
- * GET /api/settings is intentionally omitted — settings are rendered server-side
- * from the session; no separate read endpoint is needed for this page.
- *
- * PATCH /api/settings
- * Requires settings:write permission AND a valid CSRF token.
- *
- * ⚠️  In production, resolve the session from the request (JWT / cookie)
- *     instead of using MOCK_API_SESSION, then assertPermission against it.
- */
+export async function GET(): Promise<NextResponse> {
+  const guard = guardPermission(MOCK_API_SESSION, "settings:read");
+  if (!guard.ok) return guard.response;
+
+  return handleApiError(async () => {
+    return await getSettingsRepository().get();
+  });
+}
+
 export async function PATCH(request: Request): Promise<NextResponse> {
+  const guard = requireSessionAndPermission(request, "settings:write");
+  if (!guard.ok) return guard.response;
+  const { session } = guard;
+
+  let body: unknown;
   try {
-    assertCsrfToken(request);
-  } catch (err) {
-    if (err instanceof CsrfError) {
-      return apiError(err.message, 403);
-    }
-    throw err;
+    body = await request.json();
+  } catch {
+    return apiValidationError("Request body must be valid JSON.", [
+      { field: "_root", message: "Request body must be valid JSON." },
+    ]);
   }
 
-  try {
-    assertPermission(MOCK_API_SESSION, "settings:write");
-  } catch (err) {
-    if (err instanceof PermissionDeniedError) {
-      return apiError(err.message, 403);
-    }
-    throw err;
+  const validation = validateSettingsPatch(body);
+  if (!validation.ok) {
+    return apiValidationError("Invalid settings", validation.errors);
   }
 
   return handleApiError(async () => {
-    // TODO: parse request body and persist settings to the real data store
-    return { message: "Settings updated (stub)" };
+    const updated = await getSettingsRepository().update(validation.value);
+    await recordDashboardActivity({
+      type: "settings.updated",
+      actor: { id: session.userId, name: session.name },
+      description: "Dashboard settings updated",
+    });
+    return updated;
   });
 }

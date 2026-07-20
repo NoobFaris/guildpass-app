@@ -44,6 +44,7 @@ export type Permission =
   | "members:write"
   | "guilds:read"
   | "guilds:write"
+  | "activity:read"
   | "settings:read"
   | "settings:write";
 
@@ -85,6 +86,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "members:write",
     "guilds:read",
     "guilds:write",
+    "activity:read",
     "settings:read",
     "settings:write",
   ],
@@ -95,6 +97,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "members:write",
     "guilds:read",
     "guilds:write",
+    "activity:read",
     "settings:read",
     "settings:write",
   ],
@@ -103,12 +106,14 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "members:read",
     "members:write",
     "guilds:read",
+    "activity:read",
     "settings:read",
   ],
   readonly: [
     "passes:read",
     "members:read",
     "guilds:read",
+    "activity:read",
     "settings:read",
   ],
 };

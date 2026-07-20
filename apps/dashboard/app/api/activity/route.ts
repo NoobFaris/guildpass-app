@@ -1,33 +1,76 @@
 import { NextResponse } from "next/server";
-import { handleApiError } from "@/lib/api-helpers";
-import { mockActivity } from "@/lib/mock-data";
+import { apiError, apiResponse, apiValidationError } from "@/lib/api-helpers";
+import { filterActivityEvents, parseActivityQuery } from "@/lib/activity/query";
 import { activityStorage } from "@/lib/activity/storage";
+import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { getActivityRepository } from "@/lib/repositories/factory";
+import { getActiveGuildId } from "@/lib/guild-context";
+import { filterActivityEventsByGuild } from "@/lib/data/guild-scoped";
+import { mockActivity, type Activity } from "@/lib/mock-data";
+import {
+  CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
+  type ActivityEvent,
+} from "@guildpass/integration-client";
 
-export async function GET(): Promise<NextResponse> {
-  return handleApiError(async () => {
-    try {
-      // Get activities from repository
-      const activities = await getActivityRepository().query({});
+const TYPE_MAP: Record<Activity["type"], ActivityEvent["type"]> = {
+  member_joined: "member.joined",
+  pass_created: "pass.created",
+  pass_purchased: "pass.purchased",
+  role_changed: "member.roles_changed",
+  access_granted: "access.granted",
+};
 
-      // Merge with activity storage events for compatibility
-      const realActivities = await activityStorage.getEvents();
-      
-      // Combine both sources, sorted by newest first
-      const merged = [...activities, ...realActivities, ...mockActivity].sort(
-        (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      );
+function mockActivityToEvent(activity: Activity): ActivityEvent {
+  return {
+    id: `mock_${activity.id}`,
+    type: TYPE_MAP[activity.type],
+    source: "dashboard",
+    severity: "info",
+    actor: { name: activity.actor },
+    timestamp: activity.timestamp,
+    description: activity.description,
+    changes: activity.changes,
+    metadata: { guildId: activity.guildId },
+    schemaVersion: CURRENT_ACTIVITY_EVENT_SCHEMA_VERSION,
+  };
+}
 
-      // Remove duplicates by id
-      const seen = new Set<string>();
-      return merged.filter((item) => {
-        if (seen.has(item.id)) return false;
-        seen.add(item.id);
-        return true;
+export async function GET(request: Request): Promise<NextResponse> {
+  const guard = requireSessionAndPermission(request, "activity:read");
+  if (!guard.ok) return guard.response;
+
+  const url = new URL(request.url);
+  const parsed = parseActivityQuery(url.searchParams);
+
+  if (!parsed.ok) {
+    return apiValidationError("Invalid activity query", parsed.errors);
+  }
+
+  const guildId = getActiveGuildId(request);
+
+  try {
+    const repositoryEvents = await getActivityRepository()
+      .query({})
+      .catch((error) => {
+        console.error("Error fetching repository activity:", error);
+        return [];
       });
-    } catch (error) {
-      console.error("Error fetching activity:", error);
-      return mockActivity;
-    }
-  });
+    const storageEvents = await activityStorage.getEvents();
+    const seedEvents = mockActivity.map(mockActivityToEvent);
+
+    const seen = new Set<string>();
+    const merged = [...repositoryEvents, ...storageEvents, ...seedEvents].filter((event) => {
+      if (seen.has(event.id)) return false;
+      seen.add(event.id);
+      return true;
+    });
+
+    // Tenant scope first, then apply list filters / pagination.
+    const scoped = filterActivityEventsByGuild(merged, guildId);
+    const result = filterActivityEvents(scoped, parsed.value);
+    return apiResponse(result);
+  } catch (error) {
+    console.error("Error fetching activity:", error);
+    return apiError("Failed to fetch activity", 500);
+  }
 }
