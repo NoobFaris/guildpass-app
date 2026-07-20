@@ -11,6 +11,10 @@ apps/*/dist
 apps/docs/.docusaurus
 apps/docs/build
 .idea
+AGENTS.md
+update-test.js
+update-test.mjs
+temp/
 
 # Next.js build output
 .next/
