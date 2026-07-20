@@ -7,7 +7,7 @@ import { recordDashboardActivity } from "@/lib/activity/dashboard";
 import { getActiveGuildId } from "@/lib/guild-context";
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const guard = await requireSessionAndPermission(request, getActiveGuildId(), "settings:read");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "settings:read");
   if (!guard.ok) return guard.response;
 
   return handleApiError(async () => {
@@ -16,7 +16,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  const guard = await requireSessionAndPermission(request, getActiveGuildId(), "settings:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "settings:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 

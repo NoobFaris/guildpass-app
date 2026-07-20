@@ -25,7 +25,8 @@ import { useOptimisticMutation } from "@/lib/hooks/useOptimisticMutation";
 import { readApiResult } from "@/lib/api-client";
 import type { DashboardSettings } from "@/lib/settings";
 import { SUPPORTED_TIMEZONES } from "@/lib/timezones";
-import { useState, useRef, useEffect } from "react";
+import { validateEmailField } from "@/lib/validation/settings";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 export default function SettingsPage() {
   const session = useSession();
@@ -34,6 +35,20 @@ export default function SettingsPage() {
   const [timezone, setTimezone] = useState("UTC");
   const [displayName, setDisplayName] = useState(session.name);
   const [email, setEmail] = useState("admin@guildpass.xyz");
+
+  // Inline validation state for the email field.
+  // `emailTouched` gates whether the error is visible: we show it only after
+  // the user has blurred or actively changed the field (not on initial render).
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailTouched, setEmailTouched] = useState(false);
+
+  /** Runs the client-side email predicate and updates local error state. */
+  const validateEmail = useCallback((value: string) => {
+    setEmailError(validateEmailField(value));
+  }, []);
+
+  // The form is invalid (and Save is blocked) when there is an active email error.
+  const isFormInvalid = emailError !== null;
 
   const previousSettingsRef = useRef({ workspaceName, timezone, displayName, email });
 
@@ -50,7 +65,13 @@ export default function SettingsPage() {
         if (typeof data.workspaceName === "string") setWorkspaceName(data.workspaceName);
         if (typeof data.timezone === "string") setTimezone(data.timezone);
         if (typeof data.displayName === "string") setDisplayName(data.displayName);
-        if (typeof data.email === "string") setEmail(data.email);
+        if (typeof data.email === "string") {
+          setEmail(data.email);
+          // Reset validation state: the loaded value is server-persisted and
+          // considered clean — don't show errors until the user interacts.
+          setEmailTouched(false);
+          setEmailError(null);
+        }
         previousSettingsRef.current = {
           workspaceName: data.workspaceName,
           timezone: data.timezone,
@@ -88,6 +109,8 @@ export default function SettingsPage() {
       setTimezone(previousSettingsRef.current.timezone);
       setDisplayName(previousSettingsRef.current.displayName);
       setEmail(previousSettingsRef.current.email);
+      // Re-validate the rolled-back email value so the error state stays consistent.
+      setEmailError(validateEmailField(previousSettingsRef.current.email));
     },
     onSuccess: () => {
       alert("Settings saved successfully.");
@@ -210,13 +233,52 @@ export default function SettingsPage() {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    // Validate on every keystroke once the field has been touched,
+                    // so errors clear as soon as the user corrects the value.
+                    if (emailTouched) {
+                      validateEmail(e.target.value);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Mark as touched and run validation on first blur.
+                    setEmailTouched(true);
+                    validateEmail(e.target.value);
+                  }}
                   disabled={!canEdit || saveMutation.isPending}
-                  className={`w-full border rounded-lg px-4 py-2 transition-colors ${canEdit
-                      ? "border-slate-300 text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                      : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"
-                    } ${saveMutation.isPending ? "opacity-50" : ""}`}
+                  aria-describedby={emailError && emailTouched ? "email-error" : undefined}
+                  aria-invalid={emailError !== null && emailTouched ? true : undefined}
+                  className={`w-full border rounded-lg px-4 py-2 transition-colors ${
+                    !canEdit
+                      ? "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed"
+                      : emailError && emailTouched
+                      ? "border-red-400 text-slate-800 focus:outline-none focus:ring-2 focus:ring-red-400"
+                      : "border-slate-300 text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  } ${saveMutation.isPending ? "opacity-50" : ""}`}
                 />
+                {/* Inline error — only shown after the field is touched */}
+                {emailError && emailTouched && (
+                  <p
+                    id="email-error"
+                    role="alert"
+                    className="mt-1.5 text-xs text-red-600 flex items-center gap-1"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      className="w-3.5 h-3.5 shrink-0"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    {emailError}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -228,8 +290,9 @@ export default function SettingsPage() {
             <button
               id="btn-save-settings"
               type="submit"
-              disabled={saveMutation.isPending}
-              className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              disabled={saveMutation.isPending || isFormInvalid}
+              aria-disabled={isFormInvalid ? true : undefined}
+              className="bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {saveMutation.isPending && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
               {saveMutation.isPending ? "Saving..." : "Save Changes"}

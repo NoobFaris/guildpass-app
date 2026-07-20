@@ -75,8 +75,8 @@ export function validateSettingsPatch(input: unknown): SettingsValidationResult 
     return { ok: false, errors: mapZodErrors(result.error.issues) };
   }
 
-  const patch = result.data as Partial<DashboardSettings>;
-  const supportedKeys = ["workspaceName", "displayName", "timezone", "email"];
+  const patch = result.data as SettingsPatchPayload;
+  const supportedKeys = ["workspaceName", "displayName", "timezone", "email", "webhookForwardingSecret"];
   const providedSupportedFields = supportedKeys.filter((key) =>
     Object.prototype.hasOwnProperty.call(input, key)
   );
@@ -92,3 +92,33 @@ export function validateSettingsPatch(input: unknown): SettingsValidationResult 
 }
 
 export { settingsPatchSchema };
+
+// ---------------------------------------------------------------------------
+// Pure client-usable predicates
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates a single email value against the same rules the server uses.
+ *
+ * Returns `null` when the value is valid (or empty — the field is optional),
+ * otherwise returns a human-readable error message string.
+ *
+ * Safe to call from both client and server code because this file has no
+ * server-only imports.
+ */
+export function validateEmailField(value: string): string | null {
+  const trimmed = value.trim();
+  // Empty is allowed — the field is optional.
+  if (trimmed === "") return null;
+
+  if (trimmed.length > MAX_TEXT_LENGTH) {
+    return `Email must be ${MAX_TEXT_LENGTH} characters or fewer.`;
+  }
+
+  const result = settingsPatchSchema.shape.email.safeParse(trimmed);
+  if (!result.success) {
+    return result.error.issues[0]?.message ?? "A valid email address is required.";
+  }
+
+  return null;
+}

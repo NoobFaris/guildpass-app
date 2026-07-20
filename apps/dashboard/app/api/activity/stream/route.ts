@@ -15,7 +15,7 @@ const READY_FRAME = "event: ready\ndata: {}\n\n";
 const encoder = new TextEncoder();
 
 export async function GET(request: Request): Promise<Response> {
-  const guard = await requireSessionAndPermission(request, getActiveGuildId(), "activity:read");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "activity:read");
   if (!guard.ok) return guard.response;
 
   let dispose = () => {};

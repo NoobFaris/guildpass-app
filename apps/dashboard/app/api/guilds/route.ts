@@ -35,7 +35,7 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const guard = await requireSessionAndPermission(request, getActiveGuildId(), "guilds:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "guilds:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 

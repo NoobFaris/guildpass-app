@@ -105,14 +105,18 @@ a real database:
 
 ## Guild Scope Resolution
 
-The dashboard currently operates on a single workspace guild:
-`getActiveGuildId()` in
-[`apps/dashboard/lib/guild-context.ts`](../apps/dashboard/lib/guild-context.ts)
-resolves to `DEFAULT_GUILD_ID` (`"1"`, the seeded guild). Once per-guild
-RBAC (issue #67) lands, that helper is the single place to swap in
-session-derived guild resolution. The scope must always come from the
-authenticated session on the server — never from unauthenticated client
-input such as a query parameter.
+Operators can switch the active guild from the dashboard sidebar or via
+`/guilds/[guildId]`. Server routes resolve the tenant scope through
+`getActiveGuildId(request)` in
+[`apps/dashboard/lib/guild-context.ts`](../apps/dashboard/lib/guild-context.ts):
+
+1. `X-Guild-Id` request header (set by the dashboard client for the selected guild)
+2. `guildpass_guild_id` cookie (persisted selection)
+3. `DEFAULT_GUILD_ID` (`"1"`) fallback for unscoped callers (tests, scripts)
+
+Route handlers must call `getActiveGuildId(request)` — never hard-code a
+guild id. Once per-guild RBAC (issue #67) lands, that helper should also
+verify the authenticated session is allowed to act on the resolved guild.
 
 ## Related Documents
 

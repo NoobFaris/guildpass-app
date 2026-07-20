@@ -52,7 +52,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   // ── Auth guard ────────────────────────────────────────────────────────────
   try {
     const session = await requireDashboardSession(request);
-    assertPermission(session, getActiveGuildId(), "guilds:write");
+    assertPermission(session, getActiveGuildId(request), "guilds:write");
   } catch (err) {
     if (err instanceof PermissionDeniedError) {
       return apiError(err.message, 403);
