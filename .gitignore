@@ -16,6 +16,13 @@ update-test.js
 update-test.mjs
 temp/
 
+# Lock files
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+old-package-lock.json
+
 # Next.js build output
 .next/
 apps/dashboard/.next/
