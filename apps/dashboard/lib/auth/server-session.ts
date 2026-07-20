@@ -138,7 +138,7 @@ export async function getDashboardSession(request: Request): Promise<Session> {
  * export async function POST(request: Request) {
  *   try {
  *     const session = await requireDashboardSession(request);
- *     assertPermission(session, "passes:write");
+ *     assertPermission(session, guildId, "passes:write");
  *   } catch (err) {
  *     if (err instanceof PermissionDeniedError) return apiError(err.message, 403);
  *     if (err instanceof UnauthorizedError)    return apiError(err.message, 401);

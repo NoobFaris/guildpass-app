@@ -37,7 +37,7 @@ const emptyPage: PaginatedResult<MockMember> = {
 
 export default function MembersPage() {
   const session = useSession();
-  const canWrite = canManageMembers(session);
+  const canWrite = canManageMembers(session, session.activeGuildId);
   const apiMode = getClientApiMode();
 
   const [members, setMembers] = useState<MockMember[]>(mockMembers.slice(0, PAGE_SIZE));

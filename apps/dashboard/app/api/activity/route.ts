@@ -4,9 +4,10 @@ import { filterActivityEvents, parseActivityQuery } from "@/lib/activity/query";
 import { activityStorage } from "@/lib/activity/storage";
 import { requireSessionAndPermission } from "@/lib/auth/require-permission";
 import { getActivityRepository } from "@/lib/repositories/factory";
+import { getActiveGuildId } from "@/lib/guild-context";
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "activity:read");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(), "activity:read");
   if (!guard.ok) return guard.response;
 
   const url = new URL(request.url);

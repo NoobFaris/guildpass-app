@@ -3,6 +3,7 @@ import {
   subscribeToActivityEvents,
 } from "@/lib/activity/stream";
 import { requireSessionAndPermission } from "@/lib/auth/require-permission";
+import { getActiveGuildId } from "@/lib/guild-context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ const READY_FRAME = "event: ready\ndata: {}\n\n";
 const encoder = new TextEncoder();
 
 export async function GET(request: Request): Promise<Response> {
-  const guard = requireSessionAndPermission(request, "activity:read");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(), "activity:read");
   if (!guard.ok) return guard.response;
 
   let dispose = () => {};
