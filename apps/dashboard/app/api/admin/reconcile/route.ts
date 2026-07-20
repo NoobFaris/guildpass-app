@@ -26,6 +26,7 @@ import { reconcileGuildCounts } from "@/lib/reconciliation/index";
 import type { ReconcileOptions } from "@/lib/reconciliation/types";
 import { getMemberRepository, getPassRepository } from "@/lib/repositories/factory";
 import type { ApiFieldError } from "@/lib/api-contracts";
+import { getActiveGuildId } from "@/lib/guild-context";
 
 // ── Counting strategies ───────────────────────────────────────────────────────
 //
@@ -50,8 +51,8 @@ async function countPassesForGuild(guildId: string): Promise<number> {
 export async function POST(request: Request): Promise<NextResponse> {
   // ── Auth guard ────────────────────────────────────────────────────────────
   try {
-    const session = requireDashboardSession(request);
-    assertPermission(session, "guilds:write");
+    const session = await requireDashboardSession(request);
+    assertPermission(session, getActiveGuildId(request), "guilds:write");
   } catch (err) {
     if (err instanceof PermissionDeniedError) {
       return apiError(err.message, 403);

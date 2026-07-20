@@ -34,7 +34,7 @@ export default async function IntegrationsPage() {
   const session = await getServerComponentSession();
 
   // 2. Enforce the hard boundary: only Owners and Admins can view integrations
-  const canAccessIntegrations = hasRole(session, ["owner", "admin"]);
+  const canAccessIntegrations = hasRole(session, session.activeGuildId, ["owner", "admin"]);
 
   if (!canAccessIntegrations) {
     return (

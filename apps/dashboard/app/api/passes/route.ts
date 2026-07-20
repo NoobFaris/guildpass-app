@@ -71,7 +71,7 @@ function getFallbackPasses(request: Request, query: PassListQuery) {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "passes:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "passes:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 
@@ -100,7 +100,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 }
 
 export async function PATCH(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "passes:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "passes:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 
@@ -139,7 +139,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 }
 
 export async function DELETE(request: Request): Promise<NextResponse> {
-  const guard = requireSessionAndPermission(request, "passes:write");
+  const guard = await requireSessionAndPermission(request, getActiveGuildId(request), "passes:write");
   if (!guard.ok) return guard.response;
   const { session } = guard;
 

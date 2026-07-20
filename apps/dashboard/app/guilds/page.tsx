@@ -15,8 +15,8 @@ import { useGuild } from "@/lib/guild/GuildProvider";
 
 export default function GuildsPage() {
   const session = useSession();
-  const canWrite = canManageGuilds(session);
   const { guildId: activeGuildId, setGuildId, setGuilds: setContextGuilds } = useGuild();
+  const canWrite = canManageGuilds(session, activeGuildId);
   const [guilds, setGuilds] = useState<MockGuild[]>(mockGuilds);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [listState] = useState<"loading" | "loaded" | "unsupported" | "error">("loading");
